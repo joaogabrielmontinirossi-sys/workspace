@@ -210,6 +210,16 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
     </div>
   </details>
 
+  <section class="sync" id="bridge-sec" style="padding:14px 16px;gap:10px">
+    <div class="sec-head"><h2>Dados vinculados</h2><span id="bridge-count"></span></div>
+    <p class="hint">Com os apps vinculados, cada tarefa existe em todos eles (Frondosa, Alvorada, Capynote, Kanban, Órbita, Blocos, Blocos 2 e Blocos 3) e muda junto: título, data, texto e concluído. Não é uma cópia avulsa: é a mesma tarefa em cada app.</p>
+    <div class="row">
+      <button class="btn" id="bridge-all" type="button">Vincular todos os apps entre si</button>
+      <button class="btn ghost" id="bridge-run" type="button">Sincronizar agora</button>
+    </div>
+    <div class="msg" id="bridge-msg" role="status"></div>
+  </section>
+
   <div class="tools">
     <label class="search"><input id="q" type="search" placeholder="Buscar um app, ou uma nota, tarefa ou cartão de qualquer app" autocomplete="off" aria-label="Buscar apps e itens"><kbd aria-hidden="true">/</kbd></label>
     <select id="sort" class="sort" aria-label="Ordenar">
@@ -319,7 +329,7 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
   /* ---------- estado ---------- */
   var P = (function () {
     var p = lsGet('workspace-v1') || {};
-    return { favs: p.favs && typeof p.favs === 'object' ? p.favs : {}, opens: p.opens && typeof p.opens === 'object' ? p.opens : {}, links: p.links && typeof p.links === 'object' ? p.links : {}, gClient: typeof p.gClient === 'string' ? p.gClient : '', gWas: !!p.gWas };
+    return { favs: p.favs && typeof p.favs === 'object' ? p.favs : {}, opens: p.opens && typeof p.opens === 'object' ? p.opens : {}, links: p.links && typeof p.links === 'object' ? p.links : {}, bridges: p.bridges && typeof p.bridges === 'object' ? p.bridges : {}, bridgeAll: p.bridgeAll && typeof p.bridgeAll === 'object' ? p.bridgeAll : { on: false, mod: 0 }, gClient: typeof p.gClient === 'string' ? p.gClient : '', gWas: !!p.gWas };
   })();
   var cache = lsGet('workspace-apps') || {};
   var apps = Array.isArray(cache.apps) ? cache.apps : [], listAt = cache.at || 0, loaded = apps.length > 0, listErr = '';
@@ -473,6 +483,9 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
   addEventListener('message', function (e) {
     if (e.origin !== location.origin || !e.data || typeof e.data !== 'object') return;
     if (e.data.ws === 'delivered' && waiting[e.data.app]) waiting[e.data.app](e.data.failed);
+    else if (e.data.ws === 'bridged' && bwait[e.data.app]) bwait[e.data.app](e.data);
+    else if (e.data.ws === 'prefs') { var pv = lsGet('workspace-v1'); if (pv && typeof pv === 'object') { pv.app = 'workspace'; merge(pv); renderBridge(); syncSoon(); } }
+    else if (e.data.ws === 'bridge-run' && Array.isArray(e.data.apps)) bridgeRun(e.data.apps.filter(function (a) { return typeof a === 'string'; }));
     else if (e.data.ws === 'deliver' && Array.isArray(e.data.apps)) e.data.apps.forEach(function (a) { if (typeof a === 'string' && byId(a)) deliver(a); });
     else if (e.data.ws === 'goto' && typeof e.data.key === 'string') { var p = e.data.key.split(':'); if (byId(p[0])) openApp(p[0], true, e.data.key); }
   });
@@ -574,8 +587,8 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
     if (!r.ok && r.status !== 404) { var msg = 'O Google respondeu ' + r.status; try { msg = (await r.json()).error.message || msg; } catch (e) {} throw new Error(msg); }
     return r;
   }
-  function payload() { return { app: 'workspace', v: 1, at: Date.now(), favs: P.favs, opens: P.opens, links: P.links }; }
-  function print(p) { return JSON.stringify([Object.keys(p.favs || {}).sort().map(function (k) { return [k, p.favs[k].on ? 1 : 0, p.favs[k].mod || 0]; }), Object.keys(p.opens || {}).sort().map(function (k) { return [k, p.opens[k].n || 0, p.opens[k].t || 0]; }), Object.keys(p.links || {}).sort().map(function (k) { return [k, p.links[k].on ? 1 : 0, p.links[k].mod || 0]; })]); }
+  function payload() { return { app: 'workspace', v: 1, at: Date.now(), favs: P.favs, opens: P.opens, links: P.links, bridges: P.bridges, bridgeAll: P.bridgeAll }; }
+  function print(p) { return JSON.stringify([Object.keys(p.favs || {}).sort().map(function (k) { return [k, p.favs[k].on ? 1 : 0, p.favs[k].mod || 0]; }), Object.keys(p.opens || {}).sort().map(function (k) { return [k, p.opens[k].n || 0, p.opens[k].t || 0]; }), Object.keys(p.links || {}).sort().map(function (k) { return [k, p.links[k].on ? 1 : 0, p.links[k].mod || 0]; }), Object.keys(p.bridges || {}).sort().map(function (k) { return [k, p.bridges[k].on ? 1 : 0, p.bridges[k].mod || 0]; }), p.bridgeAll ? [p.bridgeAll.on ? 1 : 0, p.bridgeAll.mod || 0] : 0]); }
   function label(v) { v = v && typeof v === 'object' ? v : {}; return { t: String(v.t || '').slice(0, 160), app: String(v.app || ''), k: String(v.k || '') }; }
   function merge(r) {
     if (!r || r.app !== 'workspace') return false;
@@ -583,7 +596,9 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
     for (k in r.favs || {}) { var f = r.favs[k]; if (f && typeof f === 'object' && (!P.favs[k] || (Number(f.mod) || 0) > (P.favs[k].mod || 0))) { P.favs[k] = { on: !!f.on, mod: Number(f.mod) || 0 }; changed = true; } }
     for (k in r.opens || {}) { var o = r.opens[k], l = P.opens[k] || { n: 0, t: 0 }; if (o && typeof o === 'object' && ((Number(o.n) || 0) > l.n || (Number(o.t) || 0) > l.t)) { P.opens[k] = { n: Math.max(l.n, Number(o.n) || 0), t: Math.max(l.t, Number(o.t) || 0) }; changed = true; } }
     for (k in r.links || {}) { var x = r.links[k]; if (x && typeof x === 'object' && typeof x.a === 'string' && typeof x.b === 'string' && (!P.links[k] || (Number(x.mod) || 0) > (P.links[k].mod || 0))) { P.links[k] = { a: x.a, b: x.b, la: label(x.la), lb: label(x.lb), on: !!x.on, mod: Number(x.mod) || 0 }; if (x.mirror && typeof x.mirror === 'object') P.links[k].mirror = { from: String(x.mirror.from || ''), to: String(x.mirror.to || '') }; changed = true; } }
-    if (changed) { lsSet('workspace-v1', P); renderLinks(); }
+    for (k in r.bridges || {}) { var bg = r.bridges[k]; if (bg && typeof bg === 'object' && (!P.bridges[k] || (Number(bg.mod) || 0) > (P.bridges[k].mod || 0))) { P.bridges[k] = { on: !!bg.on, mod: Number(bg.mod) || 0 }; changed = true; } }
+    if (r.bridgeAll && typeof r.bridgeAll === 'object' && (Number(r.bridgeAll.mod) || 0) > (P.bridgeAll.mod || 0)) { P.bridgeAll = { on: !!r.bridgeAll.on, mod: Number(r.bridgeAll.mod) || 0 }; changed = true; }
+    if (changed) { lsSet('workspace-v1', P); renderLinks(); renderBridge(); }
     return changed;
   }
   async function driveSync() {
@@ -811,6 +826,61 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
     await buildIndex(true);
     return ok;
   }
+  /* ---------- dados vinculados: a mesma tarefa em todos os apps (quem faz o trabalho é o elo.js de cada app) ---------- */
+  var TASKAPPS = ['frondosa', 'alvorada.jgmrossi', 'capynote', 'kanban', 'orbita', 'blocos', 'blocos2', 'blocos3'], bwait = {}, bridgeBusy = false;
+  function pairsOn() { return Object.keys(P.bridges).filter(function (k) { return P.bridges[k].on; }); }
+  function renderBridge() {
+    var all = !!P.bridgeAll.on, n = pairsOn().length;
+    $('bridge-count').textContent = all ? 'todos vinculados' : n ? (n === 1 ? '1 par vinculado' : n + ' pares vinculados') : 'nenhum';
+    $('bridge-all').textContent = all ? 'Desvincular todos' : 'Vincular todos os apps entre si';
+    $('bridge-run').hidden = !all && !n;
+  }
+  /* abre o app (escondido, se não estiver aberto aqui) e espera ele terminar uma volta de sincronização */
+  function runBridge(appId) {
+    return new Promise(function (res) {
+      var a = byId(appId), ghost = null, done = false;
+      function end(v) { if (done) return; done = true; delete bwait[appId]; clearTimeout(timer); if (ghost) setTimeout(function () { ghost.remove(); }, 3000); res(v); }
+      bwait[appId] = end;
+      var timer = setTimeout(function () { end(null); }, 25000);
+      if (frames[appId]) { try { frames[appId].contentWindow.postMessage({ ws: 'cycle' }, location.origin); } catch (e) { end(null); } }
+      else if (a) { ghost = el('iframe', { src: a.url, title: '', 'aria-hidden': 'true', tabindex: '-1' }); $('ghosts').appendChild(ghost); }
+      else end(null);
+    });
+  }
+  async function bridgeRun(list) {
+    if (bridgeBusy) return;
+    bridgeBusy = true; $('bridge-run').disabled = $('bridge-all').disabled = true;
+    var order = (list || TASKAPPS).filter(function (a) { return TASKAPPS.indexOf(a) >= 0 && byId(a); }), made = 0, pulled = 0, missed = [];
+    for (var pass = 0; pass < 2; pass++) { // 1ª volta: cada app publica o que tem; 2ª: cada app recebe o que falta
+      for (var i = 0; i < order.length; i++) {
+        for (var n = 0; n < 10; n++) {
+          $('bridge-msg').textContent = 'Sincronizando ' + appTitle(order[i]) + ' (' + (pass + 1) + ' de 2)…';
+          var r = await runBridge(order[i]);
+          if (!r) { if (missed.indexOf(order[i]) < 0) missed.push(order[i]); break; }
+          made += r.made || 0; pulled += r.pulled || 0;
+          if (!r.more) break;
+        }
+      }
+    }
+    await buildIndex(true);
+    $('bridge-msg').textContent = 'Sincronizado: ' + (made === 1 ? '1 tarefa criada' : made + ' tarefas criadas') + ' e ' + (pulled === 1 ? '1 atualizada' : pulled + ' atualizadas') + ' nos apps.' + (missed.length ? ' Sem resposta de: ' + missed.map(appTitle).join(', ') + ' (abra o app uma vez e tente de novo).' : '');
+    bridgeBusy = false; $('bridge-run').disabled = $('bridge-all').disabled = false;
+    renderItems();
+  }
+  $('bridge-all').addEventListener('click', function () {
+    var on = !P.bridgeAll.on;
+    P.bridgeAll = { on: on, mod: Date.now() };
+    if (!on) Object.keys(P.bridges).forEach(function (k) { if (P.bridges[k].on) P.bridges[k] = { on: false, mod: Date.now() }; });
+    savePrefs(); renderBridge();
+    if (on) bridgeRun(); else $('bridge-msg').textContent = 'Desvinculado. As tarefas que já estão em cada app continuam lá, mas deixam de mudar juntas.';
+  });
+  $('bridge-run').addEventListener('click', function () { bridgeRun(); });
+  addEventListener('storage', function (e) {
+    if (e.key !== 'workspace-v1') return;
+    var v = lsGet('workspace-v1');
+    if (v && typeof v === 'object') { v.app = 'workspace'; merge(v); renderBridge(); }
+  });
+
   function openSheet(key, lab) { sheetKey = key; sheetLab = lab || null; sheetMode = ''; sheetMsg = ''; sheetQ = ''; renderSheet(); if (!$('sheet').open) $('sheet').showModal(); }
   var sheetLab = null;
   function renderSheet() {
@@ -890,7 +960,7 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
   });
 
   /* ---------- partida ---------- */
-  render(); show(); gRender(); renderLinks();
+  render(); show(); gRender(); renderLinks(); renderBridge();
   buildIndex(false).then(function () { renderLinks(); renderItems(); });
   if (apps.length) route();
   loadApps(false).then(function () { if (!loaded) { loaded = true; render(); } });
