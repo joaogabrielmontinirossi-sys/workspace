@@ -153,6 +153,8 @@ section { display: flex; flex-direction: column; gap: 12px; }
 .x-btn { width: 32px; height: 32px; flex: none; background: transparent; border: 1px solid transparent; border-radius: 8px; color: var(--muted); cursor: pointer; font-size: 1.1rem; line-height: 1; }
 .x-btn:hover { color: var(--red); border-color: var(--line); }
 .hint { color: var(--muted); max-width: 70ch; margin: 0; }
+#ex-box { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
+.ex-list { margin: 0; padding-left: 18px; max-height: 220px; overflow: auto; color: var(--fg); font-size: .9rem; columns: 2 240px; }
 @media (max-width: 560px) { .pair { grid-template-columns: minmax(0, 1fr) auto; } .pair > span { display: none; } }
 dialog.sheet { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 18px; padding: 20px; box-shadow: 0 0 60px -20px var(--cyan); }
 dialog.sheet::backdrop { background: rgba(3, 4, 8, .7); backdrop-filter: blur(3px); }
@@ -216,8 +218,17 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
     <div class="row">
       <button class="btn" id="bridge-all" type="button">Vincular todos os apps entre si</button>
       <button class="btn ghost" id="bridge-run" type="button">Sincronizar agora</button>
+      <button class="btn ghost" id="ex-scan" type="button">Limpar tarefas de exemplo…</button>
     </div>
     <div class="msg" id="bridge-msg" role="status"></div>
+    <div id="ex-box" hidden>
+      <p class="hint" id="ex-head"></p>
+      <ul class="ex-list" id="ex-list"></ul>
+      <div class="row">
+        <button class="btn" id="ex-go" type="button" style="background:var(--red);color:#fff">Apagar em todos os apps</button>
+        <button class="btn ghost" id="ex-cancel" type="button">Cancelar</button>
+      </div>
+    </div>
   </section>
 
   <div class="tools">
@@ -484,6 +495,7 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
     if (e.origin !== location.origin || !e.data || typeof e.data !== 'object') return;
     if (e.data.ws === 'delivered' && waiting[e.data.app]) waiting[e.data.app](e.data.failed);
     else if (e.data.ws === 'bridged' && bwait[e.data.app]) bwait[e.data.app](e.data);
+    else if (e.data.ws === 'ex') exRemoved += Number(e.data.removed) || 0;
     else if (e.data.ws === 'prefs') { var pv = lsGet('workspace-v1'); if (pv && typeof pv === 'object') { pv.app = 'workspace'; merge(pv); renderBridge(); syncSoon(); } }
     else if (e.data.ws === 'bridge-run' && Array.isArray(e.data.apps)) bridgeRun(e.data.apps.filter(function (a) { return typeof a === 'string'; }));
     else if (e.data.ws === 'deliver' && Array.isArray(e.data.apps)) e.data.apps.forEach(function (a) { if (typeof a === 'string' && byId(a)) deliver(a); });
@@ -875,6 +887,45 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
     if (on) bridgeRun(); else $('bridge-msg').textContent = 'Desvinculado. As tarefas que já estão em cada app continuam lá, mas deixam de mudar juntas.';
   });
   $('bridge-run').addEventListener('click', function () { bridgeRun(); });
+  /* limpar as tarefas de exemplo que vêm com os apps: primeiro procura e mostra, só apaga depois da confirmação */
+  var exRemoved = 0;
+  async function exRound(label) {
+    var missed = [], order = TASKAPPS.filter(byId);
+    for (var i = 0; i < order.length; i++) {
+      $('bridge-msg').textContent = label + ' ' + appTitle(order[i]) + '…';
+      if (!(await runBridge(order[i]))) missed.push(appTitle(order[i]));
+    }
+    return missed;
+  }
+  function exBusy(on) { bridgeBusy = on; ['bridge-run', 'bridge-all', 'ex-scan', 'ex-go', 'ex-cancel'].forEach(function (id) { $(id).disabled = on; }); }
+  $('ex-scan').addEventListener('click', async function () {
+    if (bridgeBusy) return;
+    exBusy(true); $('ex-box').hidden = true;
+    lsSet('ws-ex', { scan: Date.now(), go: 0, g: {} });
+    var missed = await exRound('Procurando exemplos em'), X = lsGet('ws-ex') || {}, g = X.g || {}, seen = {}, titles = [];
+    Object.keys(g).forEach(function (k) { var t = String(g[k]); if (!seen[t]) { seen[t] = 1; titles.push(t); } });
+    titles.sort(function (a, b) { return a.localeCompare(b, 'pt-BR'); });
+    exBusy(false);
+    var tail = missed.length ? ' Sem resposta de: ' + missed.join(', ') + '.' : '';
+    if (!titles.length) { $('bridge-msg').textContent = 'Nenhuma tarefa de exemplo encontrada.' + tail; return; }
+    $('bridge-msg').textContent = tail.trim();
+    $('ex-head').textContent = 'Encontrei ' + (titles.length === 1 ? '1 tarefa de exemplo' : titles.length + ' tarefas de exemplo') + '. Cada uma será apagada em todos os apps onde existir. Confira a lista: se alguma for sua de verdade, cancele e renomeie-a antes.';
+    $('ex-list').replaceChildren.apply($('ex-list'), titles.map(function (t) { return el('li', { text: t }); }));
+    $('ex-box').hidden = false;
+  });
+  $('ex-cancel').addEventListener('click', function () { $('ex-box').hidden = true; lsSet('ws-ex', { scan: 0, go: 0, g: {} }); $('bridge-msg').textContent = 'Nada foi apagado.'; });
+  $('ex-go').addEventListener('click', async function () {
+    if (bridgeBusy) return;
+    var X = lsGet('ws-ex');
+    if (!X || !X.g || !Object.keys(X.g).length) return;
+    exBusy(true); $('ex-box').hidden = true; exRemoved = 0;
+    X.go = Date.now(); lsSet('ws-ex', X);
+    var missed = await exRound('Limpando exemplos em');
+    await buildIndex(true);
+    exBusy(false);
+    $('bridge-msg').textContent = (exRemoved === 1 ? '1 tarefa de exemplo apagada' : exRemoved + ' tarefas de exemplo apagadas') + ' nos apps.' + (missed.length ? ' Sem resposta de: ' + missed.join(', ') + ' (a limpeza termina quando o app for aberto).' : '');
+    renderItems(); renderLinks();
+  });
   addEventListener('storage', function (e) {
     if (e.key !== 'workspace-v1') return;
     var v = lsGet('workspace-v1');
