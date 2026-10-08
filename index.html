@@ -169,7 +169,7 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
   <details class="sync" id="sync">
     <summary><span class="dot" id="g-dot" data-s="off"></span><span class="sync-title" id="g-title">Conta Google não conectada</span><span class="sync-more">Sincronização</span></summary>
     <div class="sync-body">
-      <p>Conecte a conta Google uma vez aqui. O Workspace entrega a mesma conexão ao Kanban, Blocos, Blocos 2, Blocos 3, Blocos Sem Fim e Frondosa, e cada um passa a sincronizar com o Drive sem pedir nada. Os seus favoritos do Workspace também vão junto.</p>
+      <p>Conecte a conta Google uma vez aqui. O Workspace entrega a mesma conexão a todos os apps, e cada um passa a sincronizar com o Drive sem pedir nada. Os seus favoritos do Workspace também vão junto. O Alvorada recebe só o ID do cliente e conecta dentro dele, porque também usa a Agenda.</p>
       <div class="row">
         <label class="fld" for="g-client">ID do cliente OAuth do Google
           <input id="g-client" placeholder="0000000000-xxxxxxxx.apps.googleusercontent.com" autocomplete="off" spellcheck="false">
@@ -237,10 +237,15 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
     'blocos2':        { tok: 'blocos2-g',        set: 'blocos2-v1-set',        file: 'blocos2-sync.json' },
     'blocos3':        { tok: 'blocos3-g',        set: 'blocos3-v1-set',        file: 'blocos3-sync.json' },
     'blocos-sem-fim': { tok: 'blocos-sem-fim-g', set: 'blocos-sem-fim-v2-set', file: 'blocos-sem-fim-sync.json' },
-    'frondosa':       { tok: 'frondosa-g',       idb: 'frondosa',              file: 'frondosa-sync.json' }
+    'frondosa':       { tok: 'frondosa-g',       idb: 'frondosa',              file: 'frondosa-sync.json' },
+    'orbita':         { tok: 'orbita-g',         gset: 'orbita-gset',          file: 'orbita-sync.json' },
+    'capynote':       { tok: 'capynote-g',       gset: 'capynote-gset',        file: 'capynote-sync.json' },
+    'prisma':         { tok: 'prisma-g',         gset: 'prisma-gset',          file: 'prisma-sync.json' },
+    'lousa':          { tok: 'lousa-g',          gset: 'lousa-gset',           file: 'lousa-sync.json' },
+    'folhear':        { tok: 'folhear-g',        gset: 'folhear-gset',         file: 'folhear-sync.json' },
+    'ishikawa':       { tok: 'ishikawa-g',       gset: 'ishikawa-gset',        file: 'ishikawa-sync.json' }
   };
   var OWN_GOOGLE = { 'alvorada.jgmrossi': { idb: 'alvorada', file: 'alvorada-sync.json' } }; // pede também a Agenda: conecta dentro do app
-  var FOLDER_ONLY = { 'orbita': 1, 'capynote': 1, 'prisma': 1, 'lousa': 1, 'folhear': 1, 'ishikawa': 1 };
 
   function lsGet(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
@@ -317,14 +322,14 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
   function syncLine(a) {
     var s, t;
     if (GSYNC[a.id]) {
-      var f = G.drive[GSYNC[a.id].file];
-      if (gOn()) { s = 'ok'; t = f ? 'No Drive: gravado ' + when(f) : 'Conectado; sincroniza ao abrir'; }
+      var f = G.drive[GSYNC[a.id].file], gs = GSYNC[a.id].gset && lsGet(GSYNC[a.id].gset);
+      if (gs && gs.off) { s = ''; t = 'Sincronização desligada dentro do app'; }
+      else if (gOn()) { s = 'ok'; t = f ? 'No Drive: gravado ' + when(f) : 'Conectado; sincroniza ao abrir'; }
       else { s = 'off'; t = 'Aguardando a conta Google'; }
     } else if (OWN_GOOGLE[a.id]) {
       var f2 = G.drive[OWN_GOOGLE[a.id].file];
       s = f2 ? 'ok' : ''; t = f2 ? 'No Drive: gravado ' + when(f2) : 'Conecta dentro do app (Drive e Agenda)';
-    } else if (FOLDER_ONLY[a.id]) { s = ''; t = 'Sincroniza só no programa de Windows'; }
-    else return null;
+    } else return null;
     return el('div', { class: 'card-sync' }, [el('span', { class: 'dot', 'data-s': s }), el('span', { text: t })]);
   }
   function card(a) {
@@ -453,7 +458,7 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
   async function detectClient() {
     if (P.gClient) return;
     var found = '';
-    Object.keys(GSYNC).forEach(function (id) { var s = GSYNC[id].set && lsGet(GSYNC[id].set); if (!found && s && typeof s.gClient === 'string' && s.gClient.trim()) found = s.gClient.trim(); });
+    Object.keys(GSYNC).forEach(function (id) { var s = lsGet(GSYNC[id].set || GSYNC[id].gset || ''); if (!found && s && typeof s.gClient === 'string' && s.gClient.trim()) found = s.gClient.trim(); });
     var dbs = ['frondosa', 'alvorada'];
     for (var i = 0; !found && i < dbs.length; i++) await idbSettings(dbs[i], function (rec) { if (typeof rec.gClient === 'string' && rec.gClient.trim()) found = rec.gClient.trim(); return false; });
     if (found) { P.gClient = found; lsSet('workspace-v1', P); $('g-client').value = found; gRender(); }
@@ -472,7 +477,8 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
     lsSet('workspace-g', t);
     Object.keys(GSYNC).forEach(function (id) {
       var c = GSYNC[id]; lsSet(c.tok, t);
-      if (c.set) { var s = lsGet(c.set); if (!s || typeof s !== 'object') s = {}; s.gClient = P.gClient; s.gWas = true; lsSet(c.set, s); }
+      var k = c.set || c.gset;
+      if (k) { var s = lsGet(k); if (!s || typeof s !== 'object') s = {}; if (s.gClient !== P.gClient || !s.gWas) { s.gClient = P.gClient; s.gWas = true; lsSet(k, s); } }
     });
     await idbSettings('frondosa', function (rec) { if (rec.gClient === P.gClient && rec.gWas) return false; rec.gClient = P.gClient; rec.gWas = true; return true; });
     await idbSettings('alvorada', function (rec) { if (rec.gClient) return false; rec.gClient = P.gClient; return true; }); // só deixa o ID pronto
