@@ -139,6 +139,34 @@ section { display: flex; flex-direction: column; gap: 12px; }
 .card-foot a { position: relative; z-index: 2; text-decoration: none; font-weight: 600; }
 .card-foot a:hover { text-decoration: underline; }
 
+/* Itens dos apps e vínculos */
+.items { display: flex; flex-direction: column; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.item { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; cursor: pointer; }
+.item:hover { border-color: oklch(.78 .15 var(--h, 220)); background: var(--surface-2); }
+.item i { width: 10px; height: 10px; border-radius: 50%; flex: none; background: oklch(.78 .15 var(--h, 220)); box-shadow: 0 0 8px oklch(.78 .15 var(--h, 220)); }
+.item .i-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.item .i-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .i-meta { font-size: .78rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .i-n { flex: none; font-size: .75rem; color: var(--cyan); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; }
+.pair { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.pair > span { color: var(--violet); font-weight: 600; }
+.x-btn { width: 32px; height: 32px; flex: none; background: transparent; border: 1px solid transparent; border-radius: 8px; color: var(--muted); cursor: pointer; font-size: 1.1rem; line-height: 1; }
+.x-btn:hover { color: var(--red); border-color: var(--line); }
+.hint { color: var(--muted); max-width: 70ch; margin: 0; }
+@media (max-width: 560px) { .pair { grid-template-columns: minmax(0, 1fr) auto; } .pair > span { display: none; } }
+dialog.sheet { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 18px; padding: 20px; box-shadow: 0 0 60px -20px var(--cyan); }
+dialog.sheet::backdrop { background: rgba(3, 4, 8, .7); backdrop-filter: blur(3px); }
+.sheet-in { display: flex; flex-direction: column; gap: 14px; }
+.sheet-kind { font-size: .78rem; letter-spacing: .14em; text-transform: uppercase; color: var(--cyan); }
+.sheet h2 { margin: 0; font: 900 1.7rem/1.05 var(--display); letter-spacing: .03em; text-transform: uppercase; overflow-wrap: anywhere; }
+.sheet-body { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
+.sheet h3 { margin: 4px 0 0; font: 600 .78rem var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.sheet .row { align-items: center; }
+.sheet input { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; }
+.btn.sm { padding: 8px 12px; font-size: .88rem; }
+.linkrow { display: flex; gap: 6px; align-items: center; }
+.linkrow .item { flex: 1; }
+
 .empty { border: 1px dashed var(--line); border-radius: 16px; padding: 28px 20px; color: var(--muted); text-align: center; }
 .empty strong { display: block; color: var(--fg); font: 900 1.3rem var(--display); letter-spacing: .04em; text-transform: uppercase; margin-bottom: 4px; }
 footer { color: var(--muted); font-size: .8rem; display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; }
@@ -182,7 +210,7 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
   </details>
 
   <div class="tools">
-    <label class="search"><input id="q" type="search" placeholder="Buscar um app pelo nome ou pelo que ele faz" autocomplete="off" aria-label="Buscar app"><kbd aria-hidden="true">/</kbd></label>
+    <label class="search"><input id="q" type="search" placeholder="Buscar um app, ou uma nota, tarefa ou cartão de qualquer app" autocomplete="off" aria-label="Buscar apps e itens"><kbd aria-hidden="true">/</kbd></label>
     <select id="sort" class="sort" aria-label="Ordenar">
       <option value="recent">Atualizados por último</option>
       <option value="used">Abertos por último</option>
@@ -202,8 +230,20 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
     <div class="empty" id="empty" hidden></div>
   </section>
 
+  <section id="items-sec" hidden>
+    <div class="sec-head"><h2>Dentro dos apps</h2><span id="items-count"></span></div>
+    <ul class="items" id="items"></ul>
+  </section>
+  <section id="links-sec">
+    <div class="sec-head"><h2>Vínculos</h2><span id="links-count"></span></div>
+    <p class="hint" id="links-hint">Busque acima uma nota, tarefa, cartão ou evento de qualquer app e clique nele. Dali você liga o item a itens de outros apps ou envia uma cópia para o Frondosa, Alvorada, Capynote ou Kanban.</p>
+    <div class="items" id="links"></div>
+  </section>
+
   <footer><span id="list-status">Buscando a lista no GitHub…</span><button type="button" id="refresh">Atualizar lista</button></footer>
 </main>
+
+<dialog class="sheet" id="sheet" aria-labelledby="sheet-title"><div class="sheet-in" id="sheet-in"></div></dialog>
 
 <script>
 (function () {
@@ -278,7 +318,7 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
   /* ---------- estado ---------- */
   var P = (function () {
     var p = lsGet('workspace-v1') || {};
-    return { favs: p.favs && typeof p.favs === 'object' ? p.favs : {}, opens: p.opens && typeof p.opens === 'object' ? p.opens : {}, gClient: typeof p.gClient === 'string' ? p.gClient : '', gWas: !!p.gWas };
+    return { favs: p.favs && typeof p.favs === 'object' ? p.favs : {}, opens: p.opens && typeof p.opens === 'object' ? p.opens : {}, links: p.links && typeof p.links === 'object' ? p.links : {}, gClient: typeof p.gClient === 'string' ? p.gClient : '', gWas: !!p.gWas };
   })();
   var cache = lsGet('workspace-apps') || {};
   var apps = Array.isArray(cache.apps) ? cache.apps : [], listAt = cache.at || 0, loaded = apps.length > 0, listErr = '';
@@ -380,7 +420,7 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
     var empty = $('empty'); empty.hidden = list.length > 0;
     if (!list.length) {
       empty.textContent = '';
-      empty.appendChild(el('strong', { text: apps.length ? 'Nada encontrado' : loaded ? 'Nenhum app publicado' : 'Carregando seus apps…' }));
+      empty.appendChild(el('strong', { text: apps.length ? 'Nenhum app com esse nome' : loaded ? 'Nenhum app publicado' : 'Carregando seus apps…' }));
       empty.appendChild(document.createTextNode(apps.length ? 'Nenhum app combina com essa busca. Tente outra palavra ou escolha “Tudo”.' : loaded ? (listErr || 'Todo repositório seu com site publicado aparece aqui.') : 'Cada repositório seu com site publicado vira uma ficha.'));
     }
   }
@@ -526,14 +566,16 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
     if (!r.ok && r.status !== 404) { var msg = 'O Google respondeu ' + r.status; try { msg = (await r.json()).error.message || msg; } catch (e) {} throw new Error(msg); }
     return r;
   }
-  function payload() { return { app: 'workspace', v: 1, at: Date.now(), favs: P.favs, opens: P.opens }; }
-  function print(p) { return JSON.stringify([Object.keys(p.favs || {}).sort().map(function (k) { return [k, p.favs[k].on ? 1 : 0, p.favs[k].mod || 0]; }), Object.keys(p.opens || {}).sort().map(function (k) { return [k, p.opens[k].n || 0, p.opens[k].t || 0]; })]); }
+  function payload() { return { app: 'workspace', v: 1, at: Date.now(), favs: P.favs, opens: P.opens, links: P.links }; }
+  function print(p) { return JSON.stringify([Object.keys(p.favs || {}).sort().map(function (k) { return [k, p.favs[k].on ? 1 : 0, p.favs[k].mod || 0]; }), Object.keys(p.opens || {}).sort().map(function (k) { return [k, p.opens[k].n || 0, p.opens[k].t || 0]; }), Object.keys(p.links || {}).sort().map(function (k) { return [k, p.links[k].on ? 1 : 0, p.links[k].mod || 0]; })]); }
+  function label(v) { v = v && typeof v === 'object' ? v : {}; return { t: String(v.t || '').slice(0, 160), app: String(v.app || ''), k: String(v.k || '') }; }
   function merge(r) {
     if (!r || r.app !== 'workspace') return false;
     var changed = false, k;
     for (k in r.favs || {}) { var f = r.favs[k]; if (f && typeof f === 'object' && (!P.favs[k] || (Number(f.mod) || 0) > (P.favs[k].mod || 0))) { P.favs[k] = { on: !!f.on, mod: Number(f.mod) || 0 }; changed = true; } }
     for (k in r.opens || {}) { var o = r.opens[k], l = P.opens[k] || { n: 0, t: 0 }; if (o && typeof o === 'object' && ((Number(o.n) || 0) > l.n || (Number(o.t) || 0) > l.t)) { P.opens[k] = { n: Math.max(l.n, Number(o.n) || 0), t: Math.max(l.t, Number(o.t) || 0) }; changed = true; } }
-    if (changed) lsSet('workspace-v1', P);
+    for (k in r.links || {}) { var x = r.links[k]; if (x && typeof x === 'object' && typeof x.a === 'string' && typeof x.b === 'string' && (!P.links[k] || (Number(x.mod) || 0) > (P.links[k].mod || 0))) { P.links[k] = { a: x.a, b: x.b, la: label(x.la), lb: label(x.lb), on: !!x.on, mod: Number(x.mod) || 0 }; changed = true; } }
+    if (changed) { lsSet('workspace-v1', P); renderLinks(); }
     return changed;
   }
   async function driveSync() {
@@ -583,13 +625,227 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
   $('g-off').addEventListener('click', disconnect);
   function tick() { if (adoptToken()) distribute(); if (!document.hidden) driveSync(); else gRender(); }
 
+  /* ---------- itens de dentro dos apps: busca, vínculos e envio ---------- */
+  var SKIP = { kv: 1, files: 1, filemeta: 1, history: 1, tags: 1, etiquetas: 1, membros: 1, comentarios: 1, regras: 1, modelos: 1, ajustes: 1, calendars: 1, views: 1, templates: 1, listas: 1, colunas: 1, cores: 1, tipos: 1, tamanhos: 1, plantas: 1, modulos: 1, tomb: 1, log: 1, rings: 1 };
+  var KIND = { tasks: 'Tarefa', notes: 'Nota', events: 'Evento', goals: 'Meta', cartoes: 'Cartão', quadros: 'Quadro', notebooks: 'Caderno', books: 'Livro', boards: 'Planilha', screens: 'Tela', lists: 'Turma', diagrams: 'Diagrama', habits: 'Hábito', routines: 'Rotina', obras: 'Obra', blocos: 'Bloco', caixas: 'Caixa', pecas: 'Peça' };
+  var SOURCES = [
+    { app: 'kanban', ls: 'kanban-v1' }, { app: 'blocos', ls: 'blocos-v1' }, { app: 'blocos2', ls: 'blocos2-v1' }, { app: 'blocos3', ls: 'blocos3-v1' }, { app: 'orbita', ls: 'orbita-v1' },
+    { app: 'frondosa', idb: 'frondosa' }, { app: 'alvorada.jgmrossi', idb: 'alvorada' }, { app: 'capynote', idb: 'capynote' }, { app: 'folhear', idb: 'folhear' }, { app: 'prisma', idb: 'prisma' }, { app: 'lousa', idb: 'lousa' }, { app: 'ishikawa', idb: 'ishikawa' }
+  ];
+  var IDX = [], IDXMAP = {}, idxAt = 0, idxP = null, sheetKey = null, sheetMode = '', sheetMsg = '', sheetQ = '';
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+  function today() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function plain(h) { return String(h || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim(); }
+  function escHtml(v) { return String(v).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
+  function pick(r, keys) { for (var i = 0; i < keys.length; i++) if (typeof r[keys[i]] === 'string' && r[keys[i]].trim()) return r[keys[i]]; return ''; }
+  function appTitle(id) { var a = byId(id); return a ? a.title : id; }
+  function appHue(id) { var a = byId(id); return a ? a.hue : 220; }
+  function toItem(app, store, r) {
+    if (!r || typeof r !== 'object' || !r.id || r.deleted || r.lixo || r.arquivado || r.arquivada || r.isTemplate) return null;
+    var body = plain(pick(r, ['text', 'texto', 'note', 'notes', 'notas', 'desc', 'content', 'html'])).slice(0, 600);
+    var title = plain(pick(r, ['title', 'titulo', 'nome', 'name', 'acao', 'effect'])).slice(0, 160) || body.slice(0, 70);
+    if (!title) return null;
+    var date = pick(r, ['due', 'prazo', 'date', 'dia', 'start']).slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = /^\d{4}-\d{2}-\d{2}$/.test(r.id) ? String(r.id) : '';
+    var kind = store === 'items' ? ({ task: 'Tarefa', reminder: 'Lembrete' }[r.type] || 'Evento') : (KIND[store] || store);
+    return { key: app + ':' + store + ':' + r.id, app: app, store: store, id: String(r.id), title: title, body: body, date: date, kind: kind };
+  }
+  /* abre o banco de um app só se ele já existir (nunca cria nem altera a estrutura) */
+  function idbOpen(name) {
+    if (!window.indexedDB || !indexedDB.databases) return Promise.resolve(null);
+    return indexedDB.databases().then(function (list) {
+      if (!list.some(function (d) { return d.name === name; })) return null;
+      return new Promise(function (res) {
+        var rq = indexedDB.open(name);
+        rq.onupgradeneeded = function () { try { rq.transaction.abort(); } catch (e) {} };
+        rq.onerror = rq.onblocked = function () { res(null); };
+        rq.onsuccess = function () { res(rq.result); };
+      });
+    }).catch(function () { return null; });
+  }
+  function idbAll(db, store) {
+    return new Promise(function (res) {
+      if (!db.objectStoreNames.contains(store)) return res([]);
+      var rq = db.transaction(store, 'readonly').objectStore(store).getAll();
+      rq.onsuccess = function () { res(rq.result || []); }; rq.onerror = function () { res([]); };
+    });
+  }
+  function idbPut(db, store, rec) {
+    return new Promise(function (res, rej) {
+      if (!db.objectStoreNames.contains(store)) return rej(new Error('O app ainda não tem onde guardar isso.'));
+      var tx = db.transaction(store, 'readwrite'); tx.objectStore(store).put(rec);
+      tx.oncomplete = function () { res(); }; tx.onerror = tx.onabort = function () { rej(new Error('Não foi possível gravar no app.')); };
+    });
+  }
+  function buildIndex(force) {
+    if (!force && idxAt && Date.now() - idxAt < 30000) return Promise.resolve();
+    if (idxP) return idxP;
+    idxP = (async function () {
+      var out = [];
+      for (var i = 0; i < SOURCES.length; i++) {
+        var src = SOURCES[i], stores = {};
+        if (src.ls) { var d = lsGet(src.ls); if (d && typeof d === 'object') Object.keys(d).forEach(function (k) { if (Array.isArray(d[k])) stores[k] = d[k]; }); }
+        else { var db = await idbOpen(src.idb); if (db) { var names = Array.prototype.slice.call(db.objectStoreNames); for (var n = 0; n < names.length; n++) if (!SKIP[names[n]]) stores[names[n]] = await idbAll(db, names[n]); db.close(); } }
+        Object.keys(stores).forEach(function (s) { if (SKIP[s]) return; stores[s].forEach(function (r) { var it = toItem(src.app, s, r); if (it) out.push(it); }); });
+      }
+      IDX = out; IDXMAP = {}; out.forEach(function (it) { IDXMAP[it.key] = it; }); idxAt = Date.now(); idxP = null;
+    })();
+    return idxP;
+  }
+  function linkId(a, b) { return a < b ? a + '|' + b : b + '|' + a; }
+  function linksOf(key) {
+    var out = [];
+    Object.keys(P.links).forEach(function (k) { var l = P.links[k]; if (!l.on) return; if (l.a === key) out.push({ key: l.b, label: l.lb }); else if (l.b === key) out.push({ key: l.a, label: l.la }); });
+    return out;
+  }
+  function itemOf(key, lab) {
+    if (IDXMAP[key]) return IDXMAP[key];
+    var p = key.split(':'); lab = lab || {};
+    return { key: key, app: p[0], store: p[1], id: p.slice(2).join(':'), title: lab.t || 'Item de outro aparelho', body: '', date: '', kind: lab.k || '', ghost: true };
+  }
+  function setLink(a, b, on) {
+    P.links[linkId(a.key, b.key)] = { a: a.key, b: b.key, la: { t: a.title, app: a.app, k: a.kind }, lb: { t: b.title, app: b.app, k: b.kind }, on: on, mod: Date.now() };
+    savePrefs(); renderLinks();
+  }
+  function itemRow(it, onClick, tag) {
+    var n = linksOf(it.key).length;
+    var b = el(tag || 'button', { class: 'item', type: 'button', on: { click: onClick } }, [
+      el('i'),
+      el('span', { class: 'i-main' }, [el('span', { class: 'i-title', text: it.title }), el('span', { class: 'i-meta', text: [appTitle(it.app), it.kind, it.date && it.date.split('-').reverse().join('/')].filter(Boolean).join(' · ') })]),
+      n ? el('span', { class: 'i-n', title: n === 1 ? '1 vínculo' : n + ' vínculos', text: '⟷ ' + n }) : null
+    ]);
+    b.style.setProperty('--h', appHue(it.app));
+    return b;
+  }
+  function renderItems() {
+    var q = norm(ui.q), sec = $('items-sec');
+    if (!q) { sec.hidden = true; return; }
+    var list = IDX.filter(function (it) { return norm(it.title + ' ' + it.body + ' ' + it.kind + ' ' + appTitle(it.app)).indexOf(q) >= 0; });
+    sec.hidden = !list.length;
+    $('items-count').textContent = list.length > 30 ? '30 de ' + list.length : String(list.length);
+    $('items').replaceChildren.apply($('items'), list.slice(0, 30).map(function (it) { return el('li', {}, [itemRow(it, function () { openSheet(it.key); })]); }));
+  }
+  function renderLinks() {
+    var keys = Object.keys(P.links).filter(function (k) { return P.links[k].on; }).sort(function (a, b) { return P.links[b].mod - P.links[a].mod; });
+    $('links-count').textContent = keys.length ? String(keys.length) : '';
+    $('links').replaceChildren.apply($('links'), keys.map(function (k) {
+      var l = P.links[k], a = itemOf(l.a, l.la), b = itemOf(l.b, l.lb);
+      return el('div', { class: 'pair' }, [
+        itemRow(a, function () { openSheet(a.key, l.la); }), el('span', { 'aria-hidden': 'true', text: '⟷' }), itemRow(b, function () { openSheet(b.key, l.lb); }),
+        el('button', { class: 'x-btn', type: 'button', title: 'Desfazer o vínculo', 'aria-label': 'Desfazer o vínculo entre ' + a.title + ' e ' + b.title, text: '×', on: { click: function () { setLink(a, b, false); } } })
+      ]);
+    }));
+  }
+  /* cópias: cada destino cria um registro no formato do próprio app */
+  function originOf(it) { return 'Origem: ' + appTitle(it.app) + ' · ' + it.kind + ' “' + it.title + '”'; }
+  function textOf(it) { return (it.body ? it.body + '\n\n' : '') + originOf(it); }
+  function htmlOf(it) { return (it.body ? '<p>' + escHtml(it.body) + '</p>' : '') + '<p><i>' + escHtml(originOf(it)) + '</i></p>'; }
+  async function need(name, appName) { var db = await idbOpen(name); if (!db) throw new Error('Abra o ' + appName + ' uma vez neste aparelho antes de enviar algo para ele.'); return db; }
+  var TARGETS = [
+    { app: 'frondosa', label: 'Frondosa: nova tarefa', kind: 'Tarefa', store: 'tasks', fn: async function (it, now) {
+      var db = await need('frondosa', 'Frondosa'), r = { id: uid(), title: it.title, note: textOf(it), due: it.date, done: 0, order: 0, subs: [], created: now, mod: now };
+      await idbPut(db, 'tasks', r); db.close(); return r.id; } },
+    { app: 'frondosa', label: 'Frondosa: novo evento no calendário', kind: 'Evento', store: 'events', fn: async function (it, now) {
+      var db = await need('frondosa', 'Frondosa'), r = { id: uid(), title: it.title, date: it.date || today(), time: '', created: now, mod: now };
+      await idbPut(db, 'events', r); db.close(); return r.id; } },
+    { app: 'alvorada.jgmrossi', label: 'Alvorada: nova tarefa', kind: 'Tarefa', store: 'items', fn: async function (it, now) {
+      var db = await need('alvorada', 'Alvorada'), cals = await idbAll(db, 'calendars'), set = (await idbAll(db, 'kv')).filter(function (k) { return k.id === 'settings'; })[0] || {};
+      var cal = cals.filter(function (c) { return c.id === set.defCal; })[0] || cals.filter(function (c) { return !c.ro; })[0];
+      if (!cal) { db.close(); throw new Error('Abra o Alvorada uma vez neste aparelho antes de enviar algo para ele.'); }
+      var r = { id: uid(), type: 'task', title: it.title, desc: textOf(it), due: it.date, cal: cal.id, scope: 'none', start: '', end: '', rem: [], status: 'todo', created: now, updated: now, mod: now };
+      await idbPut(db, 'items', r); db.close(); return r.id; } },
+    { app: 'alvorada.jgmrossi', label: 'Alvorada: nova página no diário', kind: 'Nota', store: 'notes', fn: async function (it, now) {
+      var db = await need('alvorada', 'Alvorada'), r = { id: 'p-' + uid(), title: it.title, html: htmlOf(it), page: true, files: [], mood: '', sticker: '', color: '', created: now, mod: now };
+      await idbPut(db, 'notes', r); db.close(); return r.id; } },
+    { app: 'capynote', label: 'Capynote: nova nota', kind: 'Nota', store: 'notes', fn: async function (it, now) {
+      var db = await need('capynote', 'Capynote'), nbs = await idbAll(db, 'notebooks'), nb = nbs.filter(function (n) { return n.isDefault; })[0] || nbs[0];
+      if (!nb) { db.close(); throw new Error('Abra o Capynote uma vez neste aparelho antes de enviar algo para ele.'); }
+      var r = { id: uid(), title: it.title, content: htmlOf(it), text: textOf(it), notebookId: nb.id, tags: [], created: now, updated: now, deleted: null, shortcut: false, reminder: null, isTemplate: false, mod: now };
+      await idbPut(db, 'notes', r); db.close(); return r.id; } },
+    { app: 'capynote', label: 'Capynote: nova tarefa', kind: 'Tarefa', store: 'tasks', fn: async function (it, now) {
+      var db = await need('capynote', 'Capynote'), r = { id: uid(), title: it.title, done: false, due: it.date, flag: false, noteId: '', created: now, mod: now };
+      await idbPut(db, 'tasks', r); db.close(); return r.id; } },
+    { app: 'kanban', label: 'Kanban: novo cartão', kind: 'Cartão', store: 'cartoes', fn: async function (it, now) {
+      var d = lsGet('kanban-v1'), ord = function (a, b) { return (a.ordem || 0) - (b.ordem || 0); };
+      var q = d && Array.isArray(d.quadros) && d.quadros.filter(function (x) { return !x.arquivado; }).sort(ord)[0];
+      var l = q && Array.isArray(d.listas) && d.listas.filter(function (x) { return x.quadro === q.id && !x.arquivada; }).sort(ord)[0];
+      if (!l) throw new Error('Abra o Kanban e crie um quadro com uma lista antes de enviar algo para ele.');
+      if (!Array.isArray(d.cartoes)) d.cartoes = [];
+      var same = d.cartoes.filter(function (c) { return c.lista === l.id; }), all = d.cartoes.filter(function (c) { return c.quadro === q.id; });
+      var r = { id: uid(), quadro: q.id, lista: l.id, pai: '', titulo: it.title, texto: textOf(it), etiquetas: '', membros: '', prazo: it.date, hora: '', inicio: '', feito: 0, prio: 0, capa: '', ordem: same.reduce(function (m, c) { return Math.max(m, c.ordem || 0); }, 0) + 1, criado: now, entrou: now, arquivado: false, lixo: 0, num: all.reduce(function (m, c) { return Math.max(m, c.num || 0); }, 0) + 1, d: {}, mod: now };
+      d.cartoes.push(r);
+      try { localStorage.setItem('kanban-v1', JSON.stringify(d)); } catch (e) { throw new Error('O armazenamento do Kanban está cheio.'); }
+      return r.id; } }
+  ];
+  async function send(it, t) {
+    var now = Date.now(), id = await t.fn(it, now);
+    reloadFrame(t.app); // o app aberto aqui dentro relê os dados já com o item novo
+    await buildIndex(true);
+    var made = IDXMAP[t.app + ':' + t.store + ':' + id] || { key: t.app + ':' + t.store + ':' + id, app: t.app, title: it.title, kind: t.kind };
+    setLink(it, made, true);
+    return made;
+  }
+  function openSheet(key, lab) { sheetKey = key; sheetLab = lab || null; sheetMode = ''; sheetMsg = ''; sheetQ = ''; renderSheet(); if (!$('sheet').open) $('sheet').showModal(); }
+  var sheetLab = null;
+  function renderSheet() {
+    var it = itemOf(sheetKey, sheetLab), box = $('sheet-in'), kids = [];
+    function btn(text, cls, fn) { return el('button', { class: 'btn sm ' + cls, type: 'button', text: text, on: { click: fn } }); }
+    kids.push(el('div', { class: 'sheet-kind', text: [appTitle(it.app), it.kind, it.date && it.date.split('-').reverse().join('/')].filter(Boolean).join(' · ') }));
+    kids.push(el('h2', { id: 'sheet-title', text: it.title }));
+    if (it.body) kids.push(el('p', { class: 'sheet-body', text: it.body.length > 320 ? it.body.slice(0, 320) + '…' : it.body }));
+    if (it.ghost) kids.push(el('p', { class: 'sheet-body', text: 'Este item ainda não está neste aparelho. Abra o app e sincronize para ele aparecer.' }));
+    var acts = [btn('Abrir o ' + appTitle(it.app), '', function () { $('sheet').close(); openApp(it.app, true); })];
+    if (!it.ghost) { acts.push(btn('Vincular a…', 'ghost', function () { sheetMode = sheetMode === 'link' ? '' : 'link'; sheetMsg = ''; renderSheet(); })); acts.push(btn('Enviar cópia para…', 'ghost', function () { sheetMode = sheetMode === 'send' ? '' : 'send'; sheetMsg = ''; renderSheet(); })); }
+    acts.push(btn('Fechar', 'ghost', function () { $('sheet').close(); }));
+    kids.push(el('div', { class: 'row' }, acts));
+    if (sheetMsg) kids.push(el('div', { class: 'msg', role: 'status', text: sheetMsg }));
+    if (sheetMode === 'link') {
+      var inp = el('input', { id: 'sheet-q', type: 'search', placeholder: 'Buscar o item de outro app para ligar a este', 'aria-label': 'Buscar item para vincular', autocomplete: 'off' });
+      inp.value = sheetQ;
+      var res = el('div', { class: 'items' });
+      var fill = function () {
+        var q = norm(sheetQ), linked = {}; linksOf(it.key).forEach(function (l) { linked[l.key] = 1; });
+        var list = IDX.filter(function (o) { return o.key !== it.key && !linked[o.key] && (!q || norm(o.title + ' ' + o.body + ' ' + o.kind + ' ' + appTitle(o.app)).indexOf(q) >= 0); });
+        if (!q) list = list.filter(function (o) { return o.app !== it.app; });
+        res.replaceChildren.apply(res, list.slice(0, 8).map(function (o) { return itemRow(o, function () { setLink(it, o, true); sheetMode = ''; sheetMsg = 'Vinculado a “' + o.title + '”.'; renderSheet(); }); }));
+        if (!list.length) res.appendChild(el('p', { class: 'hint', text: 'Nada encontrado com esse texto.' }));
+      };
+      inp.addEventListener('input', function () { sheetQ = inp.value; fill(); });
+      fill(); kids.push(el('h3', { text: 'Vincular a' })); kids.push(inp); kids.push(res);
+    }
+    if (sheetMode === 'send') {
+      kids.push(el('h3', { text: 'Enviar uma cópia para' }));
+      kids.push(el('div', { class: 'row' }, TARGETS.filter(function (t) { return !(t.app === it.app && t.store === it.store); }).map(function (t) {
+        return btn(t.label, 'ghost', async function () {
+          this.disabled = true;
+          try { var made = await send(it, t); sheetMode = ''; sheetMsg = 'Criado: ' + t.label.replace(': nov', ', nov') + '. Já está vinculado a este item.'; if (!made) sheetMsg = 'Criado.'; }
+          catch (e) { sheetMsg = e.message || 'Não foi possível enviar.'; }
+          renderSheet(); renderItems();
+        });
+      })));
+    }
+    var ls = linksOf(it.key);
+    if (ls.length) {
+      kids.push(el('h3', { text: 'Vinculado a' }));
+      kids.push(el('div', { class: 'items' }, ls.map(function (l) {
+        var o = itemOf(l.key, l.label);
+        return el('div', { class: 'linkrow' }, [itemRow(o, function () { openSheet(o.key, l.label); }), el('button', { class: 'x-btn', type: 'button', title: 'Desfazer o vínculo', 'aria-label': 'Desfazer o vínculo com ' + o.title, text: '×', on: { click: function () { setLink(it, o, false); renderSheet(); } } })]);
+      })));
+    }
+    box.replaceChildren.apply(box, kids);
+    if (sheetMode === 'link') { var f = $('sheet-q'); if (f) f.focus(); }
+  }
+  $('sheet').addEventListener('click', function (e) { if (e.target === this) this.close(); });
+  $('sheet').addEventListener('close', function () { renderLinks(); renderItems(); });
+  var itemsSoon = debounce(function () { buildIndex(false).then(renderItems); }, 200);
+
   /* ---------- controles ---------- */
   var q = $('q'), sortSel = $('sort');
   sortSel.value = ui.sort;
-  q.addEventListener('input', function () { ui.q = q.value; render(); });
+  q.addEventListener('input', function () { ui.q = q.value; render(); renderItems(); itemsSoon(); });
   q.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') { var first = document.querySelector('#all-grid .card h3 a'); if (first) first.click(); }
-    if (e.key === 'Escape') { q.value = ''; ui.q = ''; render(); }
+    if (e.key === 'Enter') { var first = document.querySelector('#all-grid .card h3 a, #items .item'); if (first) first.click(); }
+    if (e.key === 'Escape') { q.value = ''; ui.q = ''; render(); renderItems(); }
   });
   sortSel.addEventListener('change', function () { ui.sort = sortSel.value; lsSet('workspace-sort', ui.sort); render(); });
   $('refresh').addEventListener('click', function () { loadApps(true); });
@@ -603,7 +859,8 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
   });
 
   /* ---------- partida ---------- */
-  render(); show(); gRender();
+  render(); show(); gRender(); renderLinks();
+  buildIndex(false).then(function () { renderLinks(); renderItems(); });
   if (apps.length) route();
   loadApps(false).then(function () { if (!loaded) { loaded = true; render(); } });
   detectClient().then(function () { if (adoptToken()) distribute(); driveSync(); });
