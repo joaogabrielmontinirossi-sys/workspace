@@ -473,6 +473,7 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
   addEventListener('message', function (e) {
     if (e.origin !== location.origin || !e.data || typeof e.data !== 'object') return;
     if (e.data.ws === 'delivered' && waiting[e.data.app]) waiting[e.data.app]();
+    else if (e.data.ws === 'deliver' && Array.isArray(e.data.apps)) e.data.apps.forEach(function (a) { if (typeof a === 'string' && byId(a)) deliver(a); });
     else if (e.data.ws === 'goto' && typeof e.data.key === 'string') { var p = e.data.key.split(':'); if (byId(p[0])) openApp(p[0], true, e.data.key); }
   });
   addEventListener('popstate', route);
@@ -655,7 +656,8 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
     var date = pick(r, ['due', 'prazo', 'date', 'dia', 'start']).slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = /^\d{4}-\d{2}-\d{2}$/.test(r.id) ? String(r.id) : '';
     var kind = store === 'items' ? ({ task: 'Tarefa', reminder: 'Lembrete' }[r.type] || 'Evento') : (KIND[store] || store);
-    return { key: app + ':' + store + ':' + r.id, app: app, store: store, id: String(r.id), title: title, body: body, date: date, kind: kind };
+    var done = !!(r.done && typeof r.done !== 'object') || !!r.feito || r.status === 'done';
+    return { key: app + ':' + store + ':' + r.id, app: app, store: store, id: String(r.id), title: title, body: body, date: date, kind: kind, done: done };
   }
   /* abre o banco de um app só se ele já existir (nunca cria nem altera a estrutura) */
   function idbOpen(name) {
@@ -752,6 +754,25 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
     { app: 'kanban', store: 'cartoes', kind: 'Cartão', label: 'Kanban: novo cartão' }
   ];
   var waiting = {};
+  /* onde existe a ideia de "concluído" (igual ao elo.js) */
+  var DONE = { 'frondosa': { tasks: 1 }, 'capynote': { tasks: 1 }, 'alvorada.jgmrossi': { items: 1 }, 'kanban': { cartoes: 1 } };
+  function group(key) {
+    var seen = {}, q = [key]; seen[key] = 1;
+    while (q.length) { var c = q.pop(); Object.keys(P.links).forEach(function (k) { var L = P.links[k]; if (!L.on) return; var o = L.a === c ? L.b : L.b === c ? L.a : null; if (o && !seen[o]) { seen[o] = 1; q.push(o); } }); }
+    return Object.keys(seen);
+  }
+  function doneKeys(key) { return group(key).filter(function (k) { var p = k.split(':'); return DONE[p[0]] && DONE[p[0]][p[1]]; }); }
+  /* conclui (ou reabre) o item e todos os ligados a ele; cada app aplica no próprio dado */
+  async function doneAll(key, on) {
+    var apps = {}, keys = doneKeys(key);
+    keys.forEach(function (k) {
+      var p = k.split(':'), ik = 'ws-inbox:' + p[0], list = lsGet(ik); if (!Array.isArray(list)) list = [];
+      list.push({ op: 'done', store: p[1], id: p.slice(2).join(':'), on: !!on, at: Date.now() }); lsSet(ik, list); apps[p[0]] = 1;
+    });
+    var res = await Promise.all(Object.keys(apps).map(deliver));
+    await buildIndex(true);
+    return { n: keys.length, apps: Object.keys(apps).map(appTitle), ok: res.every(Boolean) };
+  }
   /* espera o app avisar que criou o item; se ele não estiver aberto aqui, abre-o escondido só para isso */
   function deliver(appId) {
     return new Promise(function (res) {
@@ -785,12 +806,17 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
   function renderSheet() {
     var it = itemOf(sheetKey, sheetLab), box = $('sheet-in'), kids = [];
     function btn(text, cls, fn) { return el('button', { class: 'btn sm ' + cls, type: 'button', text: text, on: { click: fn } }); }
-    kids.push(el('div', { class: 'sheet-kind', text: [appTitle(it.app), it.kind, it.date && it.date.split('-').reverse().join('/')].filter(Boolean).join(' · ') }));
+    kids.push(el('div', { class: 'sheet-kind', text: [appTitle(it.app), it.kind, it.date && it.date.split('-').reverse().join('/'), it.done && 'concluído'].filter(Boolean).join(' · ') }));
     kids.push(el('h2', { id: 'sheet-title', text: it.title }));
     if (it.body) kids.push(el('p', { class: 'sheet-body', text: it.body.length > 320 ? it.body.slice(0, 320) + '…' : it.body }));
     if (it.ghost) kids.push(el('p', { class: 'sheet-body', text: 'Este item ainda não está neste aparelho. Abra o app e sincronize para ele aparecer.' }));
     var acts = [btn('Abrir o ' + appTitle(it.app), '', function () { $('sheet').close(); openApp(it.app, true, it.key); })];
     if (!it.ghost) { acts.push(btn('Vincular a…', 'ghost', function () { sheetMode = sheetMode === 'link' ? '' : 'link'; sheetMsg = ''; renderSheet(); })); acts.push(btn('Enviar cópia para…', 'ghost', function () { sheetMode = sheetMode === 'send' ? '' : 'send'; sheetMsg = ''; renderSheet(); })); }
+    if (doneKeys(it.key).length) acts.push(btn(it.done ? 'Reabrir em todos' : 'Concluir em todos', 'ghost', async function () {
+      this.disabled = true; var on = !it.done, r = await doneAll(it.key, on);
+      sheetMsg = (on ? 'Concluído em ' : 'Reaberto em ') + (r.n === 1 ? '1 item' : r.n + ' itens') + ' (' + r.apps.join(', ') + ')' + (r.ok ? '.' : '; algum app ainda vai aplicar quando for aberto.');
+      renderSheet(); renderItems();
+    }));
     acts.push(btn('Fechar', 'ghost', function () { $('sheet').close(); }));
     kids.push(el('div', { class: 'row' }, acts));
     if (sheetMsg) kids.push(el('div', { class: 'msg', role: 'status', text: sheetMsg }));
