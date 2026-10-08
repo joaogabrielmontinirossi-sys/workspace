@@ -777,7 +777,7 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
   function deliver(appId) {
     return new Promise(function (res) {
       var a = byId(appId), ghost = null, done = false;
-      function end(ok) { if (done) return; done = true; delete waiting[appId]; clearTimeout(timer); if (ghost) ghost.remove(); res(ok); }
+      function end(ok) { if (done) return; done = true; delete waiting[appId]; clearTimeout(timer); if (ghost) setTimeout(function () { ghost.remove(); }, 4000); /* dá tempo de o app terminar de gravar e espelhar */ res(ok); }
       waiting[appId] = function () { end(true); };
       var timer = setTimeout(function () { end(false); }, 25000);
       if (frames[appId]) { try { frames[appId].contentWindow.postMessage({ ws: 'cycle' }, location.origin); } catch (e) {} }
