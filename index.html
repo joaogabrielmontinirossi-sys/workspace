@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07080d">
+<meta name="description" content="Pepsi Doidão Workspace: todos os meus apps num lugar só, abrindo aqui dentro e com a mesma conta Google.">
+<title>Pepsi Doidão Workspace</title>
+<link rel="icon" href="https://yt3.googleusercontent.com/T5Iog53Guqaw0nTwFPRWEFvAeuItRqsu0xrKGoDDZt2egsWibt45BxZ3WY2xKrPK8djLBHmfiA=s64-c-k-c0x00ffffff-no-rj">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+/* Letreiro de neon, como a logo do canal: fundo preto, tubo ciano, copo vermelho, um toque de violeta.
+   Uma barra fixa em cima (início + apps abertos), a prateleira de fichas embaixo e, ao abrir um app, ele ocupa a tela. */
+:root {
+  color-scheme: dark;
+  --bg: #07080d;
+  --surface: #10121b;
+  --surface-2: #181b29;
+  --line: #272c42;
+  --fg: #eef0ff;
+  --muted: #959cbd;
+  --cyan: #35e0ff;
+  --red: #ff4d5e;
+  --violet: #b78cff;
+  --ok: #4fe39a;
+  --warn: #ffc24d;
+  --display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+  --body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+  --bar-h: 52px;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--body); }
+:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; border-radius: 6px; }
+button, input, select { font: inherit; color: inherit; }
+a { color: var(--cyan); }
+
+/* Barra de cima */
+.bar {
+  position: sticky; top: 0; z-index: 10; height: calc(var(--bar-h) + env(safe-area-inset-top, 0px)); padding-top: env(safe-area-inset-top, 0px);
+  display: flex; align-items: center; gap: 8px; padding-inline: 10px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line);
+}
+.home-btn { display: flex; align-items: center; gap: 9px; flex: none; background: transparent; border: 1px solid transparent; border-radius: 10px; padding: 4px 10px 4px 4px; cursor: pointer; font: 900 1.05rem/1 var(--display); letter-spacing: .06em; text-transform: uppercase; }
+.home-btn:hover, .home-btn[aria-current="page"] { border-color: var(--line); background: var(--surface); }
+.home-btn img, .home-btn .logo-fb { width: 34px; height: 34px; border-radius: 8px; flex: none; }
+.logo-fb { display: grid; place-items: center; border: 2px solid var(--cyan); color: var(--red); font: 900 1rem var(--display); }
+.tabs { display: flex; gap: 6px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { display: flex; align-items: center; flex: none; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.tab[data-on="1"] { border-color: var(--cyan); box-shadow: 0 0 0 1px var(--cyan), 0 0 14px -4px var(--cyan); }
+.tab button { background: transparent; border: 0; cursor: pointer; height: 34px; }
+.tab .t-open { display: flex; align-items: center; gap: 7px; padding: 0 4px 0 10px; font-weight: 600; white-space: nowrap; }
+.tab .t-open i { width: 9px; height: 9px; border-radius: 50%; background: oklch(.78 .15 var(--h, 220)); }
+.tab .t-close { width: 28px; color: var(--muted); font-size: 1.1rem; line-height: 1; }
+.tab .t-close:hover { color: var(--red); }
+.bar-act { display: flex; gap: 4px; flex: none; }
+.icon-btn { width: 36px; height: 36px; display: grid; place-items: center; background: transparent; border: 1px solid transparent; border-radius: 10px; cursor: pointer; color: var(--muted); text-decoration: none; }
+.icon-btn:hover { color: var(--fg); border-color: var(--line); background: var(--surface); }
+.icon-btn svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Área do app aberto */
+#frames { position: fixed; inset: calc(var(--bar-h) + env(safe-area-inset-top, 0px)) 0 0 0; background: var(--bg); }
+#frames iframe { width: 100%; height: 100%; border: 0; display: block; background: #fff; }
+
+/* Início */
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: clamp(16px, 4vw, 40px); padding-block: 28px 64px; display: flex; flex-direction: column; gap: 24px; }
+.hero { display: flex; flex-wrap: wrap; align-items: center; gap: 18px 26px; }
+.hero-logo { width: 112px; height: 112px; border-radius: 22px; flex: none; box-shadow: 0 0 0 1px var(--line), 0 0 44px -10px var(--cyan); }
+.hero-logo.logo-fb { font-size: 2.6rem; }
+.brand { margin: 0; font: 900 clamp(2.6rem, 9vw, 4.6rem)/.88 var(--display); letter-spacing: .02em; text-transform: uppercase; text-wrap: balance; }
+.brand .a { color: #eaffff; text-shadow: 0 0 6px var(--cyan), 0 0 26px color-mix(in srgb, var(--cyan) 65%, transparent); }
+.brand .b { color: #f6efff; text-shadow: 0 0 6px var(--violet), 0 0 26px color-mix(in srgb, var(--violet) 65%, transparent); }
+.brand small { display: block; margin-top: 12px; font: 600 .8rem var(--body); letter-spacing: .34em; color: var(--red); text-shadow: 0 0 12px color-mix(in srgb, var(--red) 70%, transparent); }
+
+/* Sincronização */
+.sync { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.sync summary { list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 13px 16px; }
+.sync summary::-webkit-details-marker { display: none; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none; }
+.dot[data-s="ok"] { background: var(--ok); box-shadow: 0 0 10px var(--ok); }
+.dot[data-s="wait"] { background: var(--warn); animation: pulse 1.1s ease-in-out infinite; }
+.dot[data-s="off"] { background: var(--warn); }
+@keyframes pulse { 50% { opacity: .3; } }
+.sync-title { font-weight: 600; flex: 1 1 220px; min-width: 0; }
+.sync-more { color: var(--muted); font-size: .85rem; }
+.sync-body { padding: 4px 16px 16px; display: flex; flex-direction: column; gap: 14px; border-top: 1px solid var(--line); }
+.sync-body p { margin: 12px 0 0; color: var(--muted); max-width: 70ch; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.fld { display: flex; flex-direction: column; gap: 5px; flex: 1 1 320px; min-width: 0; font-size: .8rem; color: var(--muted); }
+.fld input { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; width: 100%; color: var(--fg); }
+.btn { background: var(--cyan); color: #04121a; border: 0; border-radius: 10px; padding: 11px 16px; font-weight: 600; cursor: pointer; }
+.btn:hover { filter: brightness(1.1); }
+.btn.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+.btn.ghost:hover { background: var(--surface-2); filter: none; }
+.btn:disabled { opacity: .5; cursor: default; }
+.msg { color: var(--warn); font-size: .88rem; }
+
+/* Busca e filtros */
+.tools { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.search { flex: 1 1 260px; min-width: 0; position: relative; }
+.search input { width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 44px 12px 14px; }
+.search input::placeholder { color: var(--muted); }
+.search kbd { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font: 600 .72rem var(--body); color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px; }
+.sort { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; max-width: 100%; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font-weight: 500; font-size: .85rem; background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; cursor: pointer; }
+.chip:hover { background: var(--surface-2); }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.chip span { opacity: .6; margin-left: 5px; font-variant-numeric: tabular-nums; }
+
+section { display: flex; flex-direction: column; gap: 12px; }
+.sec-head { display: flex; align-items: baseline; gap: 10px; }
+.sec-head h2 { margin: 0; font: 900 1.5rem/1 var(--display); letter-spacing: .05em; text-transform: uppercase; }
+.sec-head span { color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 255px), 1fr)); gap: 14px; }
+
+.card { position: relative; display: flex; flex-direction: column; gap: 12px; min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.card:hover, .card:focus-within { transform: translateY(-2px); border-color: oklch(.78 .15 var(--h, 220)); box-shadow: 0 0 26px -10px oklch(.78 .15 var(--h, 220)); }
+.card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.mono { width: 52px; height: 52px; flex: none; border-radius: 14px; display: grid; place-items: center; font: 900 1.45rem/1 var(--display); letter-spacing: .02em; color: oklch(.86 .13 var(--h, 220)); border: 2px solid oklch(.78 .15 var(--h, 220)); background: oklch(.78 .15 var(--h, 220) / .1); box-shadow: 0 0 16px -6px oklch(.78 .15 var(--h, 220)), inset 0 0 12px -6px oklch(.78 .15 var(--h, 220)); }
+.star { position: relative; z-index: 2; width: 36px; height: 36px; display: grid; place-items: center; background: transparent; border: 0; border-radius: 10px; cursor: pointer; color: var(--muted); }
+.star:hover { background: var(--surface-2); color: var(--fg); }
+.star svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+.star[aria-pressed="true"] { color: var(--red); filter: drop-shadow(0 0 6px var(--red)); }
+.star[aria-pressed="true"] svg { fill: currentColor; }
+.card h3 { margin: 0; font: 900 1.45rem/1.05 var(--display); letter-spacing: .03em; text-transform: uppercase; overflow-wrap: anywhere; }
+.card h3 a { color: inherit; text-decoration: none; }
+.card h3 a::after { content: ""; position: absolute; inset: 0; border-radius: 16px; z-index: 1; }
+.card h3 a:focus-visible { outline: none; }
+.card:has(h3 a:focus-visible) { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.card p { margin: 0; color: var(--muted); font-size: .9rem; flex: 1; overflow-wrap: anywhere; }
+.card-sync { display: flex; align-items: center; gap: 7px; font-size: .78rem; color: var(--muted); }
+.card-sync .dot { width: 7px; height: 7px; }
+.card-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; font-size: .78rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px; }
+.card-foot nav { display: flex; gap: 12px; }
+.card-foot a { position: relative; z-index: 2; text-decoration: none; font-weight: 600; }
+.card-foot a:hover { text-decoration: underline; }
+
+.empty { border: 1px dashed var(--line); border-radius: 16px; padding: 28px 20px; color: var(--muted); text-align: center; }
+.empty strong { display: block; color: var(--fg); font: 900 1.3rem var(--display); letter-spacing: .04em; text-transform: uppercase; margin-bottom: 4px; }
+footer { color: var(--muted); font-size: .8rem; display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; }
+footer button { background: transparent; border: 0; padding: 0; color: var(--cyan); cursor: pointer; font-weight: 600; }
+@media (max-width: 520px) { .home-btn span { display: none; } .home-btn { padding: 4px; } }
+@media (prefers-reduced-motion: reduce) { .dot[data-s="wait"] { animation: none; } .card { transition: none; } }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <button class="home-btn" id="home-btn" type="button" title="Início do Workspace" aria-current="page"><img id="logo-s" alt="" referrerpolicy="no-referrer" src="https://yt3.googleusercontent.com/T5Iog53Guqaw0nTwFPRWEFvAeuItRqsu0xrKGoDDZt2egsWibt45BxZ3WY2xKrPK8djLBHmfiA=s88-c-k-c0x00ffffff-no-rj"><span>Workspace</span></button>
+  <div class="tabs" id="tabs" role="tablist" aria-label="Apps abertos"></div>
+  <div class="bar-act" id="bar-act" hidden>
+    <button class="icon-btn" id="reload" type="button" title="Recarregar este app" aria-label="Recarregar este app"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 6.2"/><path d="M20 4v7h-7"/></svg></button>
+    <a class="icon-btn" id="pop" target="_blank" rel="noopener" title="Abrir em outra aba" aria-label="Abrir em outra aba"><svg viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg></a>
+  </div>
+</header>
+
+<div id="frames" hidden></div>
+
+<main class="wrap" id="home">
+  <div class="hero">
+    <img class="hero-logo" id="logo-l" alt="Logo do canal Pepsi Doidão" referrerpolicy="no-referrer" src="https://yt3.googleusercontent.com/T5Iog53Guqaw0nTwFPRWEFvAeuItRqsu0xrKGoDDZt2egsWibt45BxZ3WY2xKrPK8djLBHmfiA=s240-c-k-c0x00ffffff-no-rj">
+    <h1 class="brand"><span class="a">Pepsi</span> <span class="b">Doidão</span><small>WORKSPACE</small></h1>
+  </div>
+
+  <details class="sync" id="sync">
+    <summary><span class="dot" id="g-dot" data-s="off"></span><span class="sync-title" id="g-title">Conta Google não conectada</span><span class="sync-more">Sincronização</span></summary>
+    <div class="sync-body">
+      <p>Conecte a conta Google uma vez aqui. O Workspace entrega a mesma conexão ao Kanban, Blocos, Blocos 2, Blocos 3, Blocos Sem Fim e Frondosa, e cada um passa a sincronizar com o Drive sem pedir nada. Os seus favoritos do Workspace também vão junto.</p>
+      <div class="row">
+        <label class="fld" for="g-client">ID do cliente OAuth do Google
+          <input id="g-client" placeholder="0000000000-xxxxxxxx.apps.googleusercontent.com" autocomplete="off" spellcheck="false">
+        </label>
+        <button class="btn" id="g-connect" type="button">Conectar e sincronizar tudo</button>
+        <button class="btn ghost" id="g-off" type="button" hidden>Desconectar</button>
+      </div>
+      <div class="msg" id="g-msg" role="status"></div>
+    </div>
+  </details>
+
+  <div class="tools">
+    <label class="search"><input id="q" type="search" placeholder="Buscar um app pelo nome ou pelo que ele faz" autocomplete="off" aria-label="Buscar app"><kbd aria-hidden="true">/</kbd></label>
+    <select id="sort" class="sort" aria-label="Ordenar">
+      <option value="recent">Atualizados por último</option>
+      <option value="used">Abertos por último</option>
+      <option value="most">Mais abertos</option>
+      <option value="az">A–Z</option>
+    </select>
+  </div>
+  <div class="chips" id="chips" role="group" aria-label="Filtrar por tipo"></div>
+
+  <section id="fav-sec" hidden>
+    <div class="sec-head"><h2>Favoritos</h2><span id="fav-count"></span></div>
+    <div class="grid" id="fav-grid"></div>
+  </section>
+  <section>
+    <div class="sec-head"><h2 id="all-title">Todos os apps</h2><span id="all-count"></span></div>
+    <div class="grid" id="all-grid"></div>
+    <div class="empty" id="empty" hidden></div>
+  </section>
+
+  <footer><span id="list-status">Buscando a lista no GitHub…</span><button type="button" id="refresh">Atualizar lista</button></footer>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  var m = /^([a-z0-9-]+)\.github\.io$/i.exec(location.hostname);
+  var USER = m ? m[1] : 'joaogabrielmontinirossi-sys';
+  var SELF = (m && location.pathname.split('/')[1]) || 'workspace';
+  var GAPI = 'https://www.googleapis.com/';
+  var SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+
+  /* O que o Workspace sabe de cada app. Repositório novo entra sozinho, em "Outros". */
+  var META = {
+    'kanban':            { sigla: 'K',  hue: 235, cat: 'Tarefas e rotina' },
+    'blocos':            { sigla: 'B',  hue: 25,  cat: 'Tarefas e rotina' },
+    'blocos2':           { sigla: 'B2', hue: 70,  cat: 'Tarefas e rotina' },
+    'blocos3':           { sigla: 'B3', hue: 50,  cat: 'Tarefas e rotina' },
+    'orbita':            { sigla: 'Ó',  hue: 300, cat: 'Tarefas e rotina', title: 'Órbita' },
+    'frondosa':          { sigla: 'F',  hue: 150, cat: 'Tarefas e rotina' },
+    'alvorada.jgmrossi': { sigla: 'A',  hue: 350, cat: 'Tarefas e rotina' },
+    'capynote':          { sigla: 'C',  hue: 110, cat: 'Notas e leitura' },
+    'folhear':           { sigla: 'Fo', hue: 85,  cat: 'Notas e leitura' },
+    'prisma':            { sigla: 'P',  hue: 325, cat: 'Dados e diagramas' },
+    'ishikawa':          { sigla: 'I',  hue: 205, cat: 'Dados e diagramas' },
+    'lousa':             { sigla: 'L',  hue: 175, cat: 'Sala de aula' },
+    'blocos-sem-fim':    { sigla: 'B∞', hue: 10,  cat: 'Lazer' }
+  };
+  /* Onde cada app guarda a conexão Google (todos moram no mesmo endereço, então o Workspace alcança). */
+  var GSYNC = {
+    'kanban':         { tok: 'kanban-g',         set: 'kanban-v1-set',         file: 'kanban-sync.json' },
+    'blocos':         { tok: 'blocos-g',         set: 'blocos-v1-set',         file: 'blocos-sync.json' },
+    'blocos2':        { tok: 'blocos2-g',        set: 'blocos2-v1-set',        file: 'blocos2-sync.json' },
+    'blocos3':        { tok: 'blocos3-g',        set: 'blocos3-v1-set',        file: 'blocos3-sync.json' },
+    'blocos-sem-fim': { tok: 'blocos-sem-fim-g', set: 'blocos-sem-fim-v2-set', file: 'blocos-sem-fim-sync.json' },
+    'frondosa':       { tok: 'frondosa-g',       idb: 'frondosa',              file: 'frondosa-sync.json' }
+  };
+  var OWN_GOOGLE = { 'alvorada.jgmrossi': { idb: 'alvorada', file: 'alvorada-sync.json' } }; // pede também a Agenda: conecta dentro do app
+  var FOLDER_ONLY = { 'orbita': 1, 'capynote': 1, 'prisma': 1, 'lousa': 1, 'folhear': 1, 'ishikawa': 1 };
+
+  function lsGet(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+  function $(id) { return document.getElementById(id); }
+  function el(tag, attrs, kids) {
+    var n = document.createElement(tag);
+    for (var k in attrs || {}) {
+      if (k === 'text') n.textContent = attrs[k];
+      else if (k === 'on') for (var ev in attrs.on) n.addEventListener(ev, attrs.on[ev]);
+      else n.setAttribute(k, attrs[k]);
+    }
+    (kids || []).forEach(function (c) { if (c) n.appendChild(c); });
+    return n;
+  }
+  function norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  function hhmm(t) { return new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
+  function when(t) {
+    var d = new Date(t), now = new Date();
+    if (d.toDateString() === now.toDateString()) return 'hoje às ' + hhmm(t);
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' às ' + hhmm(t);
+  }
+  function ago(iso) {
+    var t = Date.parse(iso); if (!t) return '';
+    var d = Math.floor((Date.now() - t) / 864e5);
+    return d <= 0 ? 'atualizado hoje' : d === 1 ? 'atualizado ontem' : d < 30 ? 'atualizado há ' + d + ' dias' : 'atualizado em ' + new Date(t).toLocaleDateString('pt-BR');
+  }
+  function debounce(fn, ms) { var t; return function () { clearTimeout(t); t = setTimeout(fn, ms); }; }
+
+  /* ---------- estado ---------- */
+  var P = (function () {
+    var p = lsGet('workspace-v1') || {};
+    return { favs: p.favs && typeof p.favs === 'object' ? p.favs : {}, opens: p.opens && typeof p.opens === 'object' ? p.opens : {}, gClient: typeof p.gClient === 'string' ? p.gClient : '', gWas: !!p.gWas };
+  })();
+  var cache = lsGet('workspace-apps') || {};
+  var apps = Array.isArray(cache.apps) ? cache.apps : [], listAt = cache.at || 0, loaded = apps.length > 0, listErr = '';
+  var ui = { q: '', cat: lsGet('workspace-cat') || '', sort: lsGet('workspace-sort') || 'recent' };
+  var G = { token: '', exp: 0, last: 0, error: '', busy: false, file: null, drive: {} };
+  var open = [], frames = {}, active = null;
+
+  function savePrefs() { lsSet('workspace-v1', P); syncSoon(); }
+  function isFav(id) { return !!(P.favs[id] && P.favs[id].on); }
+  function byId(id) { for (var i = 0; i < apps.length; i++) if (apps[i].id === id) return apps[i]; return null; }
+
+  /* ---------- lista de apps, direto do GitHub ---------- */
+  function fromRepo(r) {
+    var meta = META[r.name] || {}, d = String(r.description || ''), i = d.indexOf(': ');
+    var title = meta.title || (i > 0 && i <= 32 ? d.slice(0, i) : r.name.charAt(0).toUpperCase() + r.name.slice(1));
+    var desc = (i > 0 && i <= 32 ? d.slice(i + 2) : d)
+      .replace(/\s*Para Windows, site e celular.*$/i, '')
+      .replace(/,?\s*(e|com) sincroniza[cç][aã]o pelo Google Drive.*$/i, '').trim();
+    if (desc) { desc = desc.charAt(0).toUpperCase() + desc.slice(1); if (!/[.!?]$/.test(desc)) desc += '.'; }
+    var h = 0; for (var k = 0; k < r.name.length; k++) h = (h * 31 + r.name.charCodeAt(k)) % 360;
+    return { id: r.name, title: title, desc: desc, url: /^https:\/\//.test(r.homepage || '') ? r.homepage : 'https://' + USER + '.github.io/' + r.name + '/', repo: r.html_url, pushedAt: r.pushed_at, cat: meta.cat || (r.topics && r.topics[0]) || 'Outros', sigla: meta.sigla || title.charAt(0).toUpperCase(), hue: meta.hue == null ? h : meta.hue };
+  }
+  async function loadApps(force) {
+    if (!force && apps.length && Date.now() - listAt < 5 * 60000) { listStatus(); return; }
+    $('list-status').textContent = 'Buscando a lista no GitHub…';
+    try {
+      var r = await fetch('https://api.github.com/users/' + USER + '/repos?per_page=100&sort=pushed&type=owner', { headers: { Accept: 'application/vnd.github+json' } });
+      if (!r.ok) throw new Error(r.status === 403 ? 'O GitHub limitou as consultas por agora' : 'O GitHub respondeu ' + r.status);
+      var list = (await r.json()).filter(function (x) { return x.has_pages && !x.fork && !x.archived && x.name !== SELF && x.name.toLowerCase() !== (USER + '.github.io').toLowerCase(); }).map(fromRepo);
+      apps = list; listAt = Date.now(); listErr = ''; lsSet('workspace-apps', { at: listAt, apps: apps });
+    } catch (e) { listErr = e.message || 'Sem acesso ao GitHub'; }
+    loaded = true; listStatus(); render(); route();
+  }
+  function listStatus() {
+    $('list-status').textContent = listErr ? listErr + (apps.length ? '; mostrando a lista salva ' + when(listAt) + '.' : '.') : 'Lista sincronizada com o GitHub ' + when(listAt) + '.';
+  }
+
+  /* ---------- fichas ---------- */
+  var STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg>';
+  function gOn() { return !!(P.gClient && G.token && G.exp > Date.now()); }
+  function syncLine(a) {
+    var s, t;
+    if (GSYNC[a.id]) {
+      var f = G.drive[GSYNC[a.id].file];
+      if (gOn()) { s = 'ok'; t = f ? 'No Drive: gravado ' + when(f) : 'Conectado; sincroniza ao abrir'; }
+      else { s = 'off'; t = 'Aguardando a conta Google'; }
+    } else if (OWN_GOOGLE[a.id]) {
+      var f2 = G.drive[OWN_GOOGLE[a.id].file];
+      s = f2 ? 'ok' : ''; t = f2 ? 'No Drive: gravado ' + when(f2) : 'Conecta dentro do app (Drive e Agenda)';
+    } else if (FOLDER_ONLY[a.id]) { s = ''; t = 'Sincroniza só no programa de Windows'; }
+    else return null;
+    return el('div', { class: 'card-sync' }, [el('span', { class: 'dot', 'data-s': s }), el('span', { text: t })]);
+  }
+  function card(a) {
+    var fav = isFav(a.id);
+    var star = el('button', { class: 'star', type: 'button', 'aria-pressed': String(fav), 'aria-label': (fav ? 'Tirar dos favoritos: ' : 'Favoritar: ') + a.title, title: fav ? 'Tirar dos favoritos' : 'Favoritar', on: { click: function () { P.favs[a.id] = { on: !fav, mod: Date.now() }; savePrefs(); render(); } } });
+    star.innerHTML = STAR;
+    var link = el('a', { href: a.url, text: a.title, on: { click: function (e) { if (e.ctrlKey || e.metaKey || e.shiftKey || e.button) return; e.preventDefault(); openApp(a.id, true); } } });
+    var c = el('article', { class: 'card' }, [
+      el('div', { class: 'card-top' }, [el('div', { class: 'mono', 'aria-hidden': 'true', text: a.sigla }), star]),
+      el('h3', {}, [link]),
+      el('p', { text: a.desc }),
+      syncLine(a),
+      el('div', { class: 'card-foot' }, [
+        el('span', { text: [a.cat, ago(a.pushedAt)].filter(Boolean).join(' · ') }),
+        el('nav', {}, [el('a', { href: a.url, target: '_blank', rel: 'noopener', text: 'Outra aba' }), el('a', { href: a.repo, target: '_blank', rel: 'noopener', text: 'Código' })])
+      ])
+    ]);
+    c.style.setProperty('--h', a.hue);
+    return c;
+  }
+  function sorted(list) {
+    var o = P.opens, s = ui.sort;
+    return list.slice().sort(function (a, b) {
+      if (s === 'az') return a.title.localeCompare(b.title, 'pt-BR', { numeric: true });
+      if (s === 'used') { var d = ((o[b.id] || {}).t || 0) - ((o[a.id] || {}).t || 0); if (d) return d; }
+      if (s === 'most') { var n = ((o[b.id] || {}).n || 0) - ((o[a.id] || {}).n || 0); if (n) return n; }
+      return (Date.parse(b.pushedAt) || 0) - (Date.parse(a.pushedAt) || 0);
+    });
+  }
+  function render() {
+    var counts = {}, box = $('chips');
+    apps.forEach(function (a) { counts[a.cat] = (counts[a.cat] || 0) + 1; });
+    if (ui.cat && !counts[ui.cat]) ui.cat = '';
+    box.textContent = '';
+    if (apps.length) [['', 'Tudo', apps.length]].concat(Object.keys(counts).sort(function (a, b) { return a.localeCompare(b, 'pt-BR'); }).map(function (c) { return [c, c, counts[c]]; })).forEach(function (c) {
+      var b = el('button', { class: 'chip', type: 'button', 'aria-pressed': String(ui.cat === c[0]), text: c[1], on: { click: function () { ui.cat = c[0]; lsSet('workspace-cat', ui.cat); render(); } } });
+      b.appendChild(el('span', { text: String(c[2]) })); box.appendChild(b);
+    });
+    var q = norm(ui.q), filtering = !!(q || ui.cat);
+    var list = sorted(apps.filter(function (a) { return (!ui.cat || a.cat === ui.cat) && (!q || norm(a.title + ' ' + a.desc + ' ' + a.id + ' ' + a.cat).indexOf(q) >= 0); }));
+    var favs = filtering ? [] : sorted(apps.filter(function (a) { return isFav(a.id); }));
+    $('fav-sec').hidden = !favs.length;
+    $('fav-grid').replaceChildren.apply($('fav-grid'), favs.map(card));
+    $('fav-count').textContent = favs.length ? String(favs.length) : '';
+    $('all-title').textContent = filtering ? 'Resultado' : 'Todos os apps';
+    $('all-count').textContent = apps.length ? list.length + (list.length === 1 ? ' app' : ' apps') : '';
+    $('all-grid').replaceChildren.apply($('all-grid'), list.map(card));
+    var empty = $('empty'); empty.hidden = list.length > 0;
+    if (!list.length) {
+      empty.textContent = '';
+      empty.appendChild(el('strong', { text: apps.length ? 'Nada encontrado' : loaded ? 'Nenhum app publicado' : 'Carregando seus apps…' }));
+      empty.appendChild(document.createTextNode(apps.length ? 'Nenhum app combina com essa busca. Tente outra palavra ou escolha “Tudo”.' : loaded ? (listErr || 'Todo repositório seu com site publicado aparece aqui.') : 'Cada repositório seu com site publicado vira uma ficha.'));
+    }
+  }
+
+  /* ---------- apps abertos aqui dentro ---------- */
+  function openApp(id, push) {
+    var a = byId(id); if (!a) return;
+    if (!frames[id]) {
+      frames[id] = el('iframe', { src: a.url, title: a.title, allow: 'fullscreen; clipboard-read; clipboard-write; microphone; camera' });
+      $('frames').appendChild(frames[id]); open.push(id);
+    }
+    if (active !== id) { var o = P.opens[id] || {}; P.opens[id] = { n: (o.n || 0) + 1, t: Date.now() }; savePrefs(); }
+    active = id;
+    if (push && decodeURIComponent(location.hash.slice(1)) !== id) history.pushState(null, '', '#' + encodeURIComponent(id));
+    show();
+  }
+  function goHome(push) {
+    active = null;
+    if (push && location.hash) history.pushState(null, '', location.pathname + location.search);
+    show(); render();
+  }
+  function closeApp(id) {
+    if (!frames[id]) return;
+    frames[id].remove(); delete frames[id]; open.splice(open.indexOf(id), 1);
+    if (active === id) { active = open[open.length - 1] || null; history.replaceState(null, '', active ? '#' + encodeURIComponent(active) : location.pathname + location.search); }
+    show(); if (!active) render();
+  }
+  function show() {
+    var a = active && byId(active);
+    $('home').hidden = !!a; $('frames').hidden = !a; $('bar-act').hidden = !a;
+    if (a) $('pop').href = a.url;
+    if (a) $('home-btn').removeAttribute('aria-current'); else $('home-btn').setAttribute('aria-current', 'page');
+    document.title = a ? a.title + ' · Workspace' : 'Pepsi Doidão Workspace';
+    open.forEach(function (id) { frames[id].hidden = id !== active; });
+    $('tabs').replaceChildren.apply($('tabs'), open.map(function (id) {
+      var x = byId(id) || { title: id, hue: 220 };
+      var t = el('div', { class: 'tab', 'data-on': id === active ? '1' : '0' }, [
+        el('button', { class: 't-open', type: 'button', role: 'tab', 'aria-selected': String(id === active), on: { click: function () { openApp(id, true); } } }, [el('i'), el('span', { text: x.title })]),
+        el('button', { class: 't-close', type: 'button', 'aria-label': 'Fechar ' + x.title, title: 'Fechar', text: '×', on: { click: function () { closeApp(id); } } })
+      ]);
+      t.style.setProperty('--h', x.hue); return t;
+    }));
+  }
+  function route() {
+    var id = decodeURIComponent(location.hash.slice(1));
+    if (id && byId(id)) openApp(id, false); else if (active) goHome(false);
+  }
+  addEventListener('popstate', route);
+  addEventListener('hashchange', route);
+  $('home-btn').addEventListener('click', function () { goHome(true); });
+  $('reload').addEventListener('click', function () { reloadFrame(active); });
+  function reloadFrame(id) { var f = frames[id], a = byId(id); if (!f || !a) return; try { f.contentWindow.location.reload(); } catch (e) { f.src = a.url; } }
+
+  /* ---------- conta Google: uma conexão para todos ---------- */
+  function idbSettings(name, fn) {
+    if (!window.indexedDB || !indexedDB.databases) return Promise.resolve(false);
+    return indexedDB.databases().then(function (list) {
+      if (!list.some(function (d) { return d.name === name; })) return false; // app nunca aberto neste aparelho: não cria nada
+      return new Promise(function (res) {
+        var rq = indexedDB.open(name);
+        rq.onupgradeneeded = function () { try { rq.transaction.abort(); } catch (e) {} };
+        rq.onerror = rq.onblocked = function () { res(false); };
+        rq.onsuccess = function () {
+          var db = rq.result;
+          if (!db.objectStoreNames.contains('kv')) { db.close(); return res(false); }
+          var tx = db.transaction('kv', 'readwrite'), st = tx.objectStore('kv'), g = st.get('settings');
+          g.onsuccess = function () { var rec = g.result || { id: 'settings' }; if (fn(rec)) st.put(rec); };
+          tx.oncomplete = function () { db.close(); res(true); };
+          tx.onerror = tx.onabort = function () { db.close(); res(false); };
+        };
+      });
+    }).catch(function () { return false; });
+  }
+  /* procura um ID de cliente já digitado em algum app */
+  async function detectClient() {
+    if (P.gClient) return;
+    var found = '';
+    Object.keys(GSYNC).forEach(function (id) { var s = GSYNC[id].set && lsGet(GSYNC[id].set); if (!found && s && typeof s.gClient === 'string' && s.gClient.trim()) found = s.gClient.trim(); });
+    var dbs = ['frondosa', 'alvorada'];
+    for (var i = 0; !found && i < dbs.length; i++) await idbSettings(dbs[i], function (rec) { if (typeof rec.gClient === 'string' && rec.gClient.trim()) found = rec.gClient.trim(); return false; });
+    if (found) { P.gClient = found; lsSet('workspace-v1', P); $('g-client').value = found; gRender(); }
+  }
+  /* aproveita uma conexão feita dentro de um dos apps */
+  function adoptToken() {
+    var best = lsGet('workspace-g');
+    Object.keys(GSYNC).forEach(function (id) { var t = lsGet(GSYNC[id].tok); if (t && t.token && (!best || !best.token || t.exp > best.exp)) best = t; });
+    if (best && best.token && best.exp > Date.now() + 60000 && best.token !== G.token) { G.token = best.token; G.exp = best.exp; return true; }
+    return false;
+  }
+  /* entrega a conexão aos apps */
+  async function distribute() {
+    if (!P.gClient || !G.token) return;
+    var t = { token: G.token, exp: G.exp };
+    lsSet('workspace-g', t);
+    Object.keys(GSYNC).forEach(function (id) {
+      var c = GSYNC[id]; lsSet(c.tok, t);
+      if (c.set) { var s = lsGet(c.set); if (!s || typeof s !== 'object') s = {}; s.gClient = P.gClient; s.gWas = true; lsSet(c.set, s); }
+    });
+    await idbSettings('frondosa', function (rec) { if (rec.gClient === P.gClient && rec.gWas) return false; rec.gClient = P.gClient; rec.gWas = true; return true; });
+    await idbSettings('alvorada', function (rec) { if (rec.gClient) return false; rec.gClient = P.gClient; return true; }); // só deixa o ID pronto
+  }
+  function withdraw() {
+    lsDel('workspace-g');
+    Object.keys(GSYNC).forEach(function (id) { lsDel(GSYNC[id].tok); });
+  }
+  var gisP = null;
+  function gis() {
+    return gisP || (gisP = new Promise(function (res, rej) {
+      if (window.google && google.accounts) return res();
+      var s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client';
+      s.onload = res; s.onerror = function () { gisP = null; rej(new Error('Sem acesso ao Google. Verifique a internet.')); };
+      document.head.appendChild(s);
+    }));
+  }
+  async function connect() {
+    var v = $('g-client').value.trim();
+    if (!v) throw new Error('Informe o ID do cliente OAuth (o mesmo que você usa nos apps).');
+    P.gClient = v; lsSet('workspace-v1', P);
+    await gis();
+    var tok = await new Promise(function (res, rej) {
+      google.accounts.oauth2.initTokenClient({
+        client_id: v, scope: SCOPE,
+        callback: function (r) { r.error ? rej(new Error(r.error_description || r.error)) : res(r); },
+        error_callback: function (e) { rej(new Error(e.type === 'popup_closed' ? 'A janela do Google foi fechada.' : e.type === 'popup_failed_to_open' ? 'O navegador bloqueou a janela do Google.' : (e.message || 'Falha na autorização.'))); }
+      }).requestAccessToken({ prompt: P.gWas ? '' : 'consent' });
+    });
+    G.token = tok.access_token; G.exp = Date.now() + (tok.expires_in - 90) * 1000; G.error = ''; G.file = null;
+    P.gWas = true; lsSet('workspace-v1', P);
+    await distribute();
+    open.forEach(function (id) { if (GSYNC[id]) reloadFrame(id); });
+    await driveSync();
+  }
+  function disconnect() {
+    try { if (window.google && G.token) google.accounts.oauth2.revoke(G.token, function () {}); } catch (e) {}
+    G.token = ''; G.exp = 0; G.drive = {}; G.file = null; G.last = 0; G.error = '';
+    P.gWas = false; lsSet('workspace-v1', P); withdraw(); gRender(); render();
+  }
+  async function gfetch(path, opt) {
+    opt = opt || {};
+    var r = await fetch(GAPI + path, Object.assign({}, opt, { headers: Object.assign({ Authorization: 'Bearer ' + G.token }, opt.headers) }));
+    if (r.status === 401) { G.token = ''; G.exp = 0; withdraw(); throw new Error('A sessão do Google expirou.'); }
+    if (!r.ok && r.status !== 404) { var msg = 'O Google respondeu ' + r.status; try { msg = (await r.json()).error.message || msg; } catch (e) {} throw new Error(msg); }
+    return r;
+  }
+  function payload() { return { app: 'workspace', v: 1, at: Date.now(), favs: P.favs, opens: P.opens }; }
+  function print(p) { return JSON.stringify([Object.keys(p.favs || {}).sort().map(function (k) { return [k, p.favs[k].on ? 1 : 0, p.favs[k].mod || 0]; }), Object.keys(p.opens || {}).sort().map(function (k) { return [k, p.opens[k].n || 0, p.opens[k].t || 0]; })]); }
+  function merge(r) {
+    if (!r || r.app !== 'workspace') return false;
+    var changed = false, k;
+    for (k in r.favs || {}) { var f = r.favs[k]; if (f && typeof f === 'object' && (!P.favs[k] || (Number(f.mod) || 0) > (P.favs[k].mod || 0))) { P.favs[k] = { on: !!f.on, mod: Number(f.mod) || 0 }; changed = true; } }
+    for (k in r.opens || {}) { var o = r.opens[k], l = P.opens[k] || { n: 0, t: 0 }; if (o && typeof o === 'object' && ((Number(o.n) || 0) > l.n || (Number(o.t) || 0) > l.t)) { P.opens[k] = { n: Math.max(l.n, Number(o.n) || 0), t: Math.max(l.t, Number(o.t) || 0) }; changed = true; } }
+    if (changed) lsSet('workspace-v1', P);
+    return changed;
+  }
+  async function driveSync() {
+    if (!gOn() || G.busy || navigator.onLine === false) { gRender(); return; }
+    G.busy = true; gRender();
+    try {
+      var NAME = 'workspace-sync.json';
+      var j = await (await gfetch('drive/v3/files?spaces=appDataFolder&pageSize=200&fields=files(id,name,modifiedTime)')).json();
+      var drive = {}; G.file = null;
+      (j.files || []).forEach(function (f) { var t = Date.parse(f.modifiedTime) || 0; if (!drive[f.name] || t > drive[f.name]) drive[f.name] = t; if (f.name === NAME && !G.file) G.file = f.id; });
+      G.drive = drive;
+      var remote = null;
+      if (G.file) { var r = await gfetch('drive/v3/files/' + G.file + '?alt=media'); if (r.ok) remote = await r.json().catch(function () { return null; }); else G.file = null; }
+      if (remote && remote.app !== 'workspace') remote = null;
+      if (remote) merge(remote);
+      var local = payload();
+      if (!remote || print(remote) !== print(local)) {
+        var body = JSON.stringify(local);
+        if (G.file) await gfetch('upload/drive/v3/files/' + G.file + '?uploadType=media', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: body });
+        else {
+          var form = new FormData();
+          form.append('metadata', new Blob([JSON.stringify({ name: NAME, parents: ['appDataFolder'] })], { type: 'application/json' }));
+          form.append('file', new Blob([body], { type: 'application/json' }));
+          G.file = (await (await gfetch('upload/drive/v3/files?uploadType=multipart&fields=id', { method: 'POST', body: form })).json()).id;
+        }
+      }
+      G.error = ''; G.last = Date.now();
+    } catch (e) { G.error = e.message || 'Falha ao falar com o Google.'; }
+    G.busy = false; gRender(); if (!active) render();
+  }
+  var syncSoon = debounce(driveSync, 1500);
+  function gRender() {
+    var on = gOn(), dot = $('g-dot'), title = $('g-title'), btn = $('g-connect');
+    if (on) { dot.dataset.s = G.busy ? 'wait' : G.error ? 'off' : 'ok'; title.textContent = G.error ? 'Conta Google: ' + G.error : G.busy ? 'Sincronizando com o Google Drive…' : 'Conta Google conectada' + (G.last ? ' · sincronizado às ' + hhmm(G.last) : ''); }
+    else { dot.dataset.s = 'off'; title.textContent = P.gClient && P.gWas ? 'A sessão do Google expirou: reconecte' : 'Conta Google não conectada'; }
+    btn.textContent = on ? 'Sincronizar agora' : P.gWas ? 'Reconectar' : 'Conectar e sincronizar tudo';
+    $('g-off').hidden = !on;
+    $('g-msg').textContent = !on && G.error ? G.error : '';
+  }
+  $('g-client').value = P.gClient;
+  $('g-connect').addEventListener('click', async function () {
+    var b = this; b.disabled = true; $('g-msg').textContent = '';
+    try { if (gOn() && $('g-client').value.trim() === P.gClient) { await distribute(); await driveSync(); } else await connect(); }
+    catch (e) { G.error = e.message || 'Falha na conexão.'; }
+    b.disabled = false; gRender(); render();
+  });
+  $('g-off').addEventListener('click', disconnect);
+  function tick() { if (adoptToken()) distribute(); if (!document.hidden) driveSync(); else gRender(); }
+
+  /* ---------- controles ---------- */
+  var q = $('q'), sortSel = $('sort');
+  sortSel.value = ui.sort;
+  q.addEventListener('input', function () { ui.q = q.value; render(); });
+  q.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { var first = document.querySelector('#all-grid .card h3 a'); if (first) first.click(); }
+    if (e.key === 'Escape') { q.value = ''; ui.q = ''; render(); }
+  });
+  sortSel.addEventListener('change', function () { ui.sort = sortSel.value; lsSet('workspace-sort', ui.sort); render(); });
+  $('refresh').addEventListener('click', function () { loadApps(true); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === '/' && !active && document.activeElement !== q && !/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) { e.preventDefault(); q.focus(); }
+  });
+  ['logo-s', 'logo-l'].forEach(function (id) {
+    var img = $(id);
+    function swap() { var fb = el('span', { class: (id === 'logo-l' ? 'hero-logo ' : '') + 'logo-fb', 'aria-hidden': 'true', text: 'PD' }); img.replaceWith(fb); }
+    img.addEventListener('error', swap); if (img.complete && !img.naturalWidth) swap();
+  });
+
+  /* ---------- partida ---------- */
+  render(); show(); gRender();
+  if (apps.length) route();
+  loadApps(false).then(function () { if (!loaded) { loaded = true; render(); } });
+  detectClient().then(function () { if (adoptToken()) distribute(); driveSync(); });
+  setInterval(tick, 60000);
+  addEventListener('focus', tick);
+  addEventListener('online', tick);
+  addEventListener('storage', function (e) { if (e.key && /-g$/.test(e.key)) tick(); });
+})();
+</script>
+</body>
+</html>
