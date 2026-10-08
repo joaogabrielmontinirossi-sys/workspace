@@ -187,6 +187,7 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
 </header>
 
 <div id="frames" hidden></div>
+<div id="ghosts" hidden></div>
 
 <main class="wrap" id="home">
   <div class="hero">
@@ -236,7 +237,7 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
   </section>
   <section id="links-sec">
     <div class="sec-head"><h2>Vínculos</h2><span id="links-count"></span></div>
-    <p class="hint" id="links-hint">Busque acima uma nota, tarefa, cartão ou evento de qualquer app e clique nele. Dali você liga o item a itens de outros apps ou envia uma cópia para o Frondosa, Alvorada, Capynote ou Kanban.</p>
+    <p class="hint" id="links-hint">Busque acima uma nota, tarefa, cartão ou evento de qualquer app e clique nele. Dali você liga o item a itens de outros apps ou envia uma cópia para o Frondosa, Alvorada, Capynote ou Kanban. A cópia fica espelhada: mudar o título ou a data de um lado muda o outro.</p>
     <div class="items" id="links"></div>
   </section>
 
@@ -426,12 +427,13 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
   }
 
   /* ---------- apps abertos aqui dentro ---------- */
-  function openApp(id, push) {
+  function openApp(id, push, itemKey) {
     var a = byId(id); if (!a) return;
+    var it = itemKey ? itemKey.split(':') : null, ref = it && it[0] === id && a.url.indexOf(location.origin) === 0 ? { store: it[1], id: it.slice(2).join(':') } : null;
     if (!frames[id]) {
-      frames[id] = el('iframe', { src: a.url, title: a.title, allow: 'fullscreen; clipboard-read; clipboard-write; microphone; camera' });
+      frames[id] = el('iframe', { src: a.url + (ref ? '?wsitem=' + encodeURIComponent(ref.store + ':' + ref.id) : ''), title: a.title, allow: 'fullscreen; clipboard-read; clipboard-write; microphone; camera' });
       $('frames').appendChild(frames[id]); open.push(id);
-    }
+    } else if (ref) { try { frames[id].contentWindow.postMessage({ ws: 'open', store: ref.store, id: ref.id }, location.origin); } catch (e) {} }
     if (active !== id) { var o = P.opens[id] || {}; P.opens[id] = { n: (o.n || 0) + 1, t: Date.now() }; savePrefs(); }
     active = id;
     if (push && decodeURIComponent(location.hash.slice(1)) !== id) history.pushState(null, '', '#' + encodeURIComponent(id));
@@ -468,6 +470,11 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
     var id = decodeURIComponent(location.hash.slice(1));
     if (id && byId(id)) openApp(id, false); else if (active) goHome(false);
   }
+  addEventListener('message', function (e) {
+    if (e.origin !== location.origin || !e.data || typeof e.data !== 'object') return;
+    if (e.data.ws === 'delivered' && waiting[e.data.app]) waiting[e.data.app]();
+    else if (e.data.ws === 'goto' && typeof e.data.key === 'string') { var p = e.data.key.split(':'); if (byId(p[0])) openApp(p[0], true, e.data.key); }
+  });
   addEventListener('popstate', route);
   addEventListener('hashchange', route);
   $('home-btn').addEventListener('click', function () { goHome(true); });
@@ -574,7 +581,7 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
     var changed = false, k;
     for (k in r.favs || {}) { var f = r.favs[k]; if (f && typeof f === 'object' && (!P.favs[k] || (Number(f.mod) || 0) > (P.favs[k].mod || 0))) { P.favs[k] = { on: !!f.on, mod: Number(f.mod) || 0 }; changed = true; } }
     for (k in r.opens || {}) { var o = r.opens[k], l = P.opens[k] || { n: 0, t: 0 }; if (o && typeof o === 'object' && ((Number(o.n) || 0) > l.n || (Number(o.t) || 0) > l.t)) { P.opens[k] = { n: Math.max(l.n, Number(o.n) || 0), t: Math.max(l.t, Number(o.t) || 0) }; changed = true; } }
-    for (k in r.links || {}) { var x = r.links[k]; if (x && typeof x === 'object' && typeof x.a === 'string' && typeof x.b === 'string' && (!P.links[k] || (Number(x.mod) || 0) > (P.links[k].mod || 0))) { P.links[k] = { a: x.a, b: x.b, la: label(x.la), lb: label(x.lb), on: !!x.on, mod: Number(x.mod) || 0 }; changed = true; } }
+    for (k in r.links || {}) { var x = r.links[k]; if (x && typeof x === 'object' && typeof x.a === 'string' && typeof x.b === 'string' && (!P.links[k] || (Number(x.mod) || 0) > (P.links[k].mod || 0))) { P.links[k] = { a: x.a, b: x.b, la: label(x.la), lb: label(x.lb), on: !!x.on, mod: Number(x.mod) || 0 }; if (x.mirror && typeof x.mirror === 'object') P.links[k].mirror = { from: String(x.mirror.from || ''), to: String(x.mirror.to || '') }; changed = true; } }
     if (changed) { lsSet('workspace-v1', P); renderLinks(); }
     return changed;
   }
@@ -642,7 +649,7 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
   function appHue(id) { var a = byId(id); return a ? a.hue : 220; }
   function toItem(app, store, r) {
     if (!r || typeof r !== 'object' || !r.id || r.deleted || r.lixo || r.arquivado || r.arquivada || r.isTemplate) return null;
-    var body = plain(pick(r, ['text', 'texto', 'note', 'notes', 'notas', 'desc', 'content', 'html'])).slice(0, 600);
+    var body = plain(pick(r, ['text', 'texto', 'note', 'notes', 'notas', 'desc', 'content', 'html'])).slice(0, 4000);
     var title = plain(pick(r, ['title', 'titulo', 'nome', 'name', 'acao', 'effect'])).slice(0, 160) || body.slice(0, 70);
     if (!title) return null;
     var date = pick(r, ['due', 'prazo', 'date', 'dia', 'start']).slice(0, 10);
@@ -668,13 +675,6 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
       if (!db.objectStoreNames.contains(store)) return res([]);
       var rq = db.transaction(store, 'readonly').objectStore(store).getAll();
       rq.onsuccess = function () { res(rq.result || []); }; rq.onerror = function () { res([]); };
-    });
-  }
-  function idbPut(db, store, rec) {
-    return new Promise(function (res, rej) {
-      if (!db.objectStoreNames.contains(store)) return rej(new Error('O app ainda não tem onde guardar isso.'));
-      var tx = db.transaction(store, 'readwrite'); tx.objectStore(store).put(rec);
-      tx.oncomplete = function () { res(); }; tx.onerror = tx.onabort = function () { rej(new Error('Não foi possível gravar no app.')); };
     });
   }
   function buildIndex(force) {
@@ -703,8 +703,10 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
     var p = key.split(':'); lab = lab || {};
     return { key: key, app: p[0], store: p[1], id: p.slice(2).join(':'), title: lab.t || 'Item de outro aparelho', body: '', date: '', kind: lab.k || '', ghost: true };
   }
-  function setLink(a, b, on) {
-    P.links[linkId(a.key, b.key)] = { a: a.key, b: b.key, la: { t: a.title, app: a.app, k: a.kind }, lb: { t: b.title, app: b.app, k: b.kind }, on: on, mod: Date.now() };
+  function setLink(a, b, on, mirror) {
+    var id = linkId(a.key, b.key), old = P.links[id];
+    P.links[id] = { a: a.key, b: b.key, la: { t: a.title, app: a.app, k: a.kind }, lb: { t: b.title, app: b.app, k: b.kind }, on: on, mod: Date.now() };
+    if (mirror || (old && old.mirror)) P.links[id].mirror = mirror || old.mirror;
     savePrefs(); renderLinks();
   }
   function itemRow(it, onClick, tag) {
@@ -736,54 +738,47 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
       ]);
     }));
   }
-  /* cópias: cada destino cria um registro no formato do próprio app */
+  /* cópias: o Workspace deixa o pedido na caixa de entrada do app, e o próprio app cria o item (módulo elo.js) */
   function originOf(it) { return 'Origem: ' + appTitle(it.app) + ' · ' + it.kind + ' “' + it.title + '”'; }
   function textOf(it) { return (it.body ? it.body + '\n\n' : '') + originOf(it); }
   function htmlOf(it) { return (it.body ? '<p>' + escHtml(it.body) + '</p>' : '') + '<p><i>' + escHtml(originOf(it)) + '</i></p>'; }
-  async function need(name, appName) { var db = await idbOpen(name); if (!db) throw new Error('Abra o ' + appName + ' uma vez neste aparelho antes de enviar algo para ele.'); return db; }
   var TARGETS = [
-    { app: 'frondosa', label: 'Frondosa: nova tarefa', kind: 'Tarefa', store: 'tasks', fn: async function (it, now) {
-      var db = await need('frondosa', 'Frondosa'), r = { id: uid(), title: it.title, note: textOf(it), due: it.date, done: 0, order: 0, subs: [], created: now, mod: now };
-      await idbPut(db, 'tasks', r); db.close(); return r.id; } },
-    { app: 'frondosa', label: 'Frondosa: novo evento no calendário', kind: 'Evento', store: 'events', fn: async function (it, now) {
-      var db = await need('frondosa', 'Frondosa'), r = { id: uid(), title: it.title, date: it.date || today(), time: '', created: now, mod: now };
-      await idbPut(db, 'events', r); db.close(); return r.id; } },
-    { app: 'alvorada.jgmrossi', label: 'Alvorada: nova tarefa', kind: 'Tarefa', store: 'items', fn: async function (it, now) {
-      var db = await need('alvorada', 'Alvorada'), cals = await idbAll(db, 'calendars'), set = (await idbAll(db, 'kv')).filter(function (k) { return k.id === 'settings'; })[0] || {};
-      var cal = cals.filter(function (c) { return c.id === set.defCal; })[0] || cals.filter(function (c) { return !c.ro; })[0];
-      if (!cal) { db.close(); throw new Error('Abra o Alvorada uma vez neste aparelho antes de enviar algo para ele.'); }
-      var r = { id: uid(), type: 'task', title: it.title, desc: textOf(it), due: it.date, cal: cal.id, scope: 'none', start: '', end: '', rem: [], status: 'todo', created: now, updated: now, mod: now };
-      await idbPut(db, 'items', r); db.close(); return r.id; } },
-    { app: 'alvorada.jgmrossi', label: 'Alvorada: nova página no diário', kind: 'Nota', store: 'notes', fn: async function (it, now) {
-      var db = await need('alvorada', 'Alvorada'), r = { id: 'p-' + uid(), title: it.title, html: htmlOf(it), page: true, files: [], mood: '', sticker: '', color: '', created: now, mod: now };
-      await idbPut(db, 'notes', r); db.close(); return r.id; } },
-    { app: 'capynote', label: 'Capynote: nova nota', kind: 'Nota', store: 'notes', fn: async function (it, now) {
-      var db = await need('capynote', 'Capynote'), nbs = await idbAll(db, 'notebooks'), nb = nbs.filter(function (n) { return n.isDefault; })[0] || nbs[0];
-      if (!nb) { db.close(); throw new Error('Abra o Capynote uma vez neste aparelho antes de enviar algo para ele.'); }
-      var r = { id: uid(), title: it.title, content: htmlOf(it), text: textOf(it), notebookId: nb.id, tags: [], created: now, updated: now, deleted: null, shortcut: false, reminder: null, isTemplate: false, mod: now };
-      await idbPut(db, 'notes', r); db.close(); return r.id; } },
-    { app: 'capynote', label: 'Capynote: nova tarefa', kind: 'Tarefa', store: 'tasks', fn: async function (it, now) {
-      var db = await need('capynote', 'Capynote'), r = { id: uid(), title: it.title, done: false, due: it.date, flag: false, noteId: '', created: now, mod: now };
-      await idbPut(db, 'tasks', r); db.close(); return r.id; } },
-    { app: 'kanban', label: 'Kanban: novo cartão', kind: 'Cartão', store: 'cartoes', fn: async function (it, now) {
-      var d = lsGet('kanban-v1'), ord = function (a, b) { return (a.ordem || 0) - (b.ordem || 0); };
-      var q = d && Array.isArray(d.quadros) && d.quadros.filter(function (x) { return !x.arquivado; }).sort(ord)[0];
-      var l = q && Array.isArray(d.listas) && d.listas.filter(function (x) { return x.quadro === q.id && !x.arquivada; }).sort(ord)[0];
-      if (!l) throw new Error('Abra o Kanban e crie um quadro com uma lista antes de enviar algo para ele.');
-      if (!Array.isArray(d.cartoes)) d.cartoes = [];
-      var same = d.cartoes.filter(function (c) { return c.lista === l.id; }), all = d.cartoes.filter(function (c) { return c.quadro === q.id; });
-      var r = { id: uid(), quadro: q.id, lista: l.id, pai: '', titulo: it.title, texto: textOf(it), etiquetas: '', membros: '', prazo: it.date, hora: '', inicio: '', feito: 0, prio: 0, capa: '', ordem: same.reduce(function (m, c) { return Math.max(m, c.ordem || 0); }, 0) + 1, criado: now, entrou: now, arquivado: false, lixo: 0, num: all.reduce(function (m, c) { return Math.max(m, c.num || 0); }, 0) + 1, d: {}, mod: now };
-      d.cartoes.push(r);
-      try { localStorage.setItem('kanban-v1', JSON.stringify(d)); } catch (e) { throw new Error('O armazenamento do Kanban está cheio.'); }
-      return r.id; } }
+    { app: 'frondosa', store: 'tasks', kind: 'Tarefa', label: 'Frondosa: nova tarefa' },
+    { app: 'frondosa', store: 'events', kind: 'Evento', label: 'Frondosa: novo evento no calendário', needDate: true },
+    { app: 'alvorada.jgmrossi', store: 'items', kind: 'Tarefa', label: 'Alvorada: nova tarefa' },
+    { app: 'alvorada.jgmrossi', store: 'notes', kind: 'Nota', label: 'Alvorada: nova página no diário', html: true, prefix: 'p-' },
+    { app: 'capynote', store: 'notes', kind: 'Nota', label: 'Capynote: nova nota', html: true },
+    { app: 'capynote', store: 'tasks', kind: 'Tarefa', label: 'Capynote: nova tarefa' },
+    { app: 'kanban', store: 'cartoes', kind: 'Cartão', label: 'Kanban: novo cartão' }
   ];
+  var waiting = {};
+  /* espera o app avisar que criou o item; se ele não estiver aberto aqui, abre-o escondido só para isso */
+  function deliver(appId) {
+    return new Promise(function (res) {
+      var a = byId(appId), ghost = null, done = false;
+      function end(ok) { if (done) return; done = true; delete waiting[appId]; clearTimeout(timer); if (ghost) ghost.remove(); res(ok); }
+      waiting[appId] = function () { end(true); };
+      var timer = setTimeout(function () { end(false); }, 25000);
+      if (frames[appId]) { try { frames[appId].contentWindow.postMessage({ ws: 'cycle' }, location.origin); } catch (e) {} }
+      else if (a) { ghost = el('iframe', { src: a.url, title: '', 'aria-hidden': 'true', tabindex: '-1' }); $('ghosts').appendChild(ghost); }
+      else end(false);
+    });
+  }
   async function send(it, t) {
-    var now = Date.now(), id = await t.fn(it, now);
-    reloadFrame(t.app); // o app aberto aqui dentro relê os dados já com o item novo
+    var id = (t.prefix || '') + uid(), key = t.app + ':' + t.store + ':' + id, date = it.date || (t.needDate ? today() : '');
+    var text = textOf(it), html = htmlOf(it), k = 'ws-inbox:' + t.app, list = lsGet(k);
+    if (!Array.isArray(list)) list = [];
+    list.push({ id: id, store: t.store, title: it.title, text: text, html: html, date: date, at: Date.now() });
+    lsSet(k, list);
+    var made = { key: key, app: t.app, title: it.title, kind: t.kind }, lid = linkId(it.key, key), mb = lsGet('ws-mirror');
+    if (!mb || typeof mb !== 'object') mb = {};
+    mb[lid + '>' + t.app + ':' + id] = { t: it.title, d: date, b: t.html ? html : text };
+    mb[lid + '>' + it.app + ':' + it.id] = { t: it.title, d: date, b: null };
+    lsSet('ws-mirror', mb);
+    setLink(it, made, true, { from: it.key, to: key });
+    var ok = await deliver(t.app);
     await buildIndex(true);
-    var made = IDXMAP[t.app + ':' + t.store + ':' + id] || { key: t.app + ':' + t.store + ':' + id, app: t.app, title: it.title, kind: t.kind };
-    setLink(it, made, true);
-    return made;
+    return ok;
   }
   function openSheet(key, lab) { sheetKey = key; sheetLab = lab || null; sheetMode = ''; sheetMsg = ''; sheetQ = ''; renderSheet(); if (!$('sheet').open) $('sheet').showModal(); }
   var sheetLab = null;
@@ -794,7 +789,7 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
     kids.push(el('h2', { id: 'sheet-title', text: it.title }));
     if (it.body) kids.push(el('p', { class: 'sheet-body', text: it.body.length > 320 ? it.body.slice(0, 320) + '…' : it.body }));
     if (it.ghost) kids.push(el('p', { class: 'sheet-body', text: 'Este item ainda não está neste aparelho. Abra o app e sincronize para ele aparecer.' }));
-    var acts = [btn('Abrir o ' + appTitle(it.app), '', function () { $('sheet').close(); openApp(it.app, true); })];
+    var acts = [btn('Abrir o ' + appTitle(it.app), '', function () { $('sheet').close(); openApp(it.app, true, it.key); })];
     if (!it.ghost) { acts.push(btn('Vincular a…', 'ghost', function () { sheetMode = sheetMode === 'link' ? '' : 'link'; sheetMsg = ''; renderSheet(); })); acts.push(btn('Enviar cópia para…', 'ghost', function () { sheetMode = sheetMode === 'send' ? '' : 'send'; sheetMsg = ''; renderSheet(); })); }
     acts.push(btn('Fechar', 'ghost', function () { $('sheet').close(); }));
     kids.push(el('div', { class: 'row' }, acts));
@@ -818,7 +813,7 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
       kids.push(el('div', { class: 'row' }, TARGETS.filter(function (t) { return !(t.app === it.app && t.store === it.store); }).map(function (t) {
         return btn(t.label, 'ghost', async function () {
           this.disabled = true;
-          try { var made = await send(it, t); sheetMode = ''; sheetMsg = 'Criado: ' + t.label.replace(': nov', ', nov') + '. Já está vinculado a este item.'; if (!made) sheetMsg = 'Criado.'; }
+          try { var ok = await send(it, t); sheetMode = ''; sheetMsg = ok ? 'Criado: ' + t.label.replace(': nov', ', nov') + '. A cópia fica espelhada com este item.' : 'Pedido guardado: o item aparece assim que o ' + appTitle(t.app) + ' for aberto.'; }
           catch (e) { sheetMsg = e.message || 'Não foi possível enviar.'; }
           renderSheet(); renderItems();
         });
