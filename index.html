@@ -237,7 +237,7 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
   </section>
   <section id="links-sec">
     <div class="sec-head"><h2>Vínculos</h2><span id="links-count"></span></div>
-    <p class="hint" id="links-hint">Busque acima uma nota, tarefa, cartão ou evento de qualquer app e clique nele. Dali você liga o item a itens de outros apps ou envia uma cópia para o Frondosa, Alvorada, Capynote ou Kanban. A cópia fica espelhada: mudar o título ou a data de um lado muda o outro.</p>
+    <p class="hint" id="links-hint">Busque acima uma nota, tarefa, cartão ou evento de qualquer app e clique nele. Dali você liga o item a itens de outros apps ou envia uma cópia para o Frondosa, Alvorada, Capynote, Kanban, Órbita ou um dos Blocos. A cópia fica espelhada: mudar o título ou a data de um lado muda o outro.</p>
     <div class="items" id="links"></div>
   </section>
 
@@ -472,7 +472,7 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
   }
   addEventListener('message', function (e) {
     if (e.origin !== location.origin || !e.data || typeof e.data !== 'object') return;
-    if (e.data.ws === 'delivered' && waiting[e.data.app]) waiting[e.data.app]();
+    if (e.data.ws === 'delivered' && waiting[e.data.app]) waiting[e.data.app](e.data.failed);
     else if (e.data.ws === 'deliver' && Array.isArray(e.data.apps)) e.data.apps.forEach(function (a) { if (typeof a === 'string' && byId(a)) deliver(a); });
     else if (e.data.ws === 'goto' && typeof e.data.key === 'string') { var p = e.data.key.split(':'); if (byId(p[0])) openApp(p[0], true, e.data.key); }
   });
@@ -751,11 +751,15 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
     { app: 'alvorada.jgmrossi', store: 'notes', kind: 'Nota', label: 'Alvorada: nova página no diário', html: true, prefix: 'p-' },
     { app: 'capynote', store: 'notes', kind: 'Nota', label: 'Capynote: nova nota', html: true },
     { app: 'capynote', store: 'tasks', kind: 'Tarefa', label: 'Capynote: nova tarefa' },
-    { app: 'kanban', store: 'cartoes', kind: 'Cartão', label: 'Kanban: novo cartão' }
+    { app: 'kanban', store: 'cartoes', kind: 'Cartão', label: 'Kanban: novo cartão' },
+    { app: 'orbita', store: 'tasks', kind: 'Tarefa', label: 'Órbita: nova tarefa' },
+    { app: 'blocos', store: 'blocos', kind: 'Bloco', label: 'Blocos: novo bloco' },
+    { app: 'blocos2', store: 'blocos', kind: 'Bloco', label: 'Blocos 2: novo bloco' },
+    { app: 'blocos3', store: 'pecas', kind: 'Peça', label: 'Blocos 3: nova peça' }
   ];
   var waiting = {};
   /* onde existe a ideia de "concluído" (igual ao elo.js) */
-  var DONE = { 'frondosa': { tasks: 1 }, 'capynote': { tasks: 1 }, 'alvorada.jgmrossi': { items: 1 }, 'kanban': { cartoes: 1 } };
+  var DONE = { 'frondosa': { tasks: 1 }, 'capynote': { tasks: 1 }, 'alvorada.jgmrossi': { items: 1 }, 'kanban': { cartoes: 1 }, 'blocos': { blocos: 1 }, 'blocos2': { blocos: 1 }, 'blocos3': { pecas: 1 }, 'orbita': { tasks: 1 } };
   function group(key) {
     var seen = {}, q = [key]; seen[key] = 1;
     while (q.length) { var c = q.pop(); Object.keys(P.links).forEach(function (k) { var L = P.links[k]; if (!L.on) return; var o = L.a === c ? L.b : L.b === c ? L.a : null; if (o && !seen[o]) { seen[o] = 1; q.push(o); } }); }
@@ -778,7 +782,7 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
     return new Promise(function (res) {
       var a = byId(appId), ghost = null, done = false;
       function end(ok) { if (done) return; done = true; delete waiting[appId]; clearTimeout(timer); if (ghost) setTimeout(function () { ghost.remove(); }, 4000); /* dá tempo de o app terminar de gravar e espelhar */ res(ok); }
-      waiting[appId] = function () { end(true); };
+      waiting[appId] = function (failed) { end(!failed); };
       var timer = setTimeout(function () { end(false); }, 25000);
       if (frames[appId]) { try { frames[appId].contentWindow.postMessage({ ws: 'cycle' }, location.origin); } catch (e) {} }
       else if (a) { ghost = el('iframe', { src: a.url, title: '', 'aria-hidden': 'true', tabindex: '-1' }); $('ghosts').appendChild(ghost); }
@@ -839,7 +843,7 @@ footer button { background: transparent; border: 0; padding: 0; color: var(--cya
       kids.push(el('div', { class: 'row' }, TARGETS.filter(function (t) { return !(t.app === it.app && t.store === it.store); }).map(function (t) {
         return btn(t.label, 'ghost', async function () {
           this.disabled = true;
-          try { var ok = await send(it, t); sheetMode = ''; sheetMsg = ok ? 'Criado: ' + t.label.replace(': nov', ', nov') + '. A cópia fica espelhada com este item.' : 'Pedido guardado: o item aparece assim que o ' + appTitle(t.app) + ' for aberto.'; }
+          try { var ok = await send(it, t); sheetMode = ''; sheetMsg = ok ? 'Criado: ' + t.label.replace(': nov', ', nov') + '. A cópia fica espelhada com este item.' : 'Pedido guardado: o item aparece quando o ' + appTitle(t.app) + ' for aberto e tiver onde guardá-lo (no Blocos 3, uma obra).'; }
           catch (e) { sheetMsg = e.message || 'Não foi possível enviar.'; }
           renderSheet(); renderItems();
         });
